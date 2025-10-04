@@ -1,0 +1,4828 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local function saveSettings()
+    local settings = {
+        Theme = Fluent.CurrentTheme,
+        Acrylic = Window and Window.Acrylic or true,
+        Transparency = Window and Window.Transparency > 0 or false,
+        TeleportEnabled = teleportEnabled,
+        JumpBoostEnabled = jumpBoostEnabled,
+        JumpForce = jumpForce,
+        AntivoidEnabled = antivoidEnabled,
+        FlingEnabled = flingEnabled,
+        RecordTeleportEnabled = recordTeleportEnabled,
+        ESPEnabled = espEnabled,
+        TeleportToolEnabled = teleportToolEnabled,
+        InfinityEnabled = infinityEnabled,
+        FlyEnabled = flyEnabled,
+        NoclipEnabled = noclipEnabled,
+        InfYieldEnabled = infYieldEnabled,
+        AntiFlingEnabled = antiFlingEnabled,
+        UltraInstinctEnabled = ultraInstinctEnabled,
+        RopeEnabled = ropeEnabled,
+        AutoCraftEnabled = autoCraftEnabled,
+        PlayerTeleportEnabled = playerTeleportEnabled,
+        SitEnabled = sitEnabled,
+        SitKeybind = sitKeybind,
+        LoopWSEnabled = loopWSEnabled,
+        HoverEnabled = hoverEnabled,
+        Task1Enabled = task1Enabled,
+        Task2Enabled = task2Enabled,
+        Task3Enabled = task3Enabled,
+        Task4Enabled = task4Enabled,
+        Task5Enabled = task5Enabled,
+        Task6Enabled = task6Enabled,
+        Task7Enabled = task7Enabled,
+        Task8Enabled = task8Enabled,
+        GripPosX = gripPosX,
+        GripPosY = gripPosY,
+        GripPosZ = gripPosZ,
+        AutoTeleportItemsEnabled = autoTeleportItemsEnabled,
+        AutoHitEnabled = autoHitEnabled,
+        InvisiblePlatformEnabled = invisiblePlatformEnabled,
+        CoordinatesGrabberEnabled = coordinatesGrabberEnabled,
+        SuperRingPartsEnabled = superRingPartsEnabled,
+        SignDeleterEnabled = signDeleterEnabled,
+        ResetOnRespawnEnabled = resetOnRespawnEnabled,
+        KeybindsEnabled = keybindsEnabled,
+        KeybindSettings = keybindSettings
+    }
+    writefile("SPVK_Hub_Settings.txt", game:GetService("HttpService"):JSONEncode(settings))
+end
+
+local function loadSettings()
+    if isfile("SPVK_Hub_Settings.txt") then
+        local success, settings = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(readfile("SPVK_Hub_Settings.txt"))
+        end)
+        if success then return settings end
+    end
+    return nil
+end
+
+local savedSettings = loadSettings()
+
+local Window = Fluent:CreateWindow({
+    Title = "СПВК hub v1.8.1",
+    SubTitle = "by Napoleon,Sharik | Keybinds System",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(600, 500),
+    Acrylic = savedSettings and savedSettings.Acrylic or true,
+    Theme = savedSettings and savedSettings.Theme or "Dark",
+    MinimizeKey = Enum.KeyCode.F10
+})
+
+local Tabs = {
+    Main = Window:AddTab({Title = "Главная", Icon = "home"}),
+    Teleport = Window:AddTab({Title = "Телепорт", Icon = "map-pin"}),
+    Other = Window:AddTab({Title = "Прочее", Icon = "list"}),
+    Events = Window:AddTab({Title = "Эвенты", Icon = "calendar"}),
+    Keybinds = Window:AddTab({Title = "Кейбинды", Icon = "key"}),
+    Settings = Window:AddTab({Title = "Настройки", Icon = "settings"}),
+    Credits = Window:AddTab({Title = "Кредиты", Icon = "users"})
+}
+
+Window:SelectTab(1)
+
+-- Система кейбиндов
+local keybindsEnabled = savedSettings and savedSettings.KeybindsEnabled or false
+local keybindSettings = savedSettings and savedSettings.KeybindSettings or {
+    Teleport = "C",
+    JumpBoostOn = "Q",
+    JumpBoostOff = "Z",
+    Rope = "L",
+    AutoCraft = "P",
+    PlayerTeleportGUI = "F5",
+    Sit = "R",
+    Task1Mark = "H",
+    Task1Clear = "G",
+    Task2Mark = "H", 
+    Task2Clear = "G",
+    Task3Teleport = "R",
+    Task5Mark = "H",
+    Task5Clear = "G",
+    Task6Mark = "H",
+    Task6Clear = "G",
+    Task7Mark = "H",
+    Task7Clear = "G",
+    Task8Grip = "G",
+    RecordStart = "B",
+    RecordTeleport = "N",
+    InfinityToggle = "J"
+}
+
+local keybindConnections = {}
+local keybindDebounce = {}
+
+local function isValidKey(key)
+    local validKeys = {
+        A = true, B = true, C = true, D = true, E = true, F = true, G = true,
+        H = true, I = true, J = true, K = true, L = true, M = true, N = true,
+        O = true, P = true, Q = true, R = true, S = true, T = true, U = true,
+        V = true, W = true, X = true, Y = true, Z = true,
+        Zero = true, One = true, Two = true, Three = true, Four = true,
+        Five = true, Six = true, Seven = true, Eight = true, Nine = true,
+        F1 = true, F2 = true, F3 = true, F4 = true, F5 = true, F6 = true,
+        F7 = true, F8 = true, F9 = true, F10 = true, F11 = true, F12 = true,
+        LeftShift = true, RightShift = true, LeftControl = true, RightControl = true,
+        LeftAlt = true, RightAlt = true, Space = true, Tab = true, CapsLock = true,
+        Escape = true, Insert = true, Delete = true, Home = true, End = true,
+        PageUp = true, PageDown = true, LeftBracket = true, RightBracket = true,
+        Semicolon = true, Quote = true, Comma = true, Period = true, Slash = true,
+        Backslash = true, Minus = true, Equals = true, Backquote = true
+    }
+    return validKeys[key] == true
+end
+
+local function getKeyCodeFromString(keyString)
+    return Enum.KeyCode[keyString]
+end
+
+local function setupKeybind(keybindName, callback)
+    if not keybindsEnabled then return end
+    
+    if keybindConnections[keybindName] then
+        keybindConnections[keybindName]:Disconnect()
+    end
+    
+    local keyString = keybindSettings[keybindName]
+    if not keyString or not isValidKey(keyString) then return end
+    
+    local keyCode = getKeyCodeFromString(keyString)
+    if not keyCode then return end
+    
+    keybindConnections[keybindName] = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == keyCode then
+            local currentTime = tick()
+            if not keybindDebounce[keybindName] or currentTime - keybindDebounce[keybindName] > 0.1 then
+                keybindDebounce[keybindName] = currentTime
+                callback()
+            end
+        end
+    end)
+end
+
+local function toggleAllKeybinds(value)
+    keybindsEnabled = value
+    
+    if value then
+        -- Включить все активные кейбинды на основе текущих состояний функций
+        if teleportEnabled then 
+            setupKeybind("Teleport", function()
+                -- Функция телепорта будет здесь
+            end)
+        end
+        if jumpBoostEnabled then
+            setupKeybind("JumpBoostOn", function()
+                -- Функция включения прыжка
+            end)
+            setupKeybind("JumpBoostOff", function()
+                -- Функция выключения прыжка
+            end)
+        end
+        if ropeEnabled then setupKeybind("Rope", function() end) end
+        if autoCraftEnabled then setupKeybind("AutoCraft", function() end) end
+        if playerTeleportEnabled then setupKeybind("PlayerTeleportGUI", function() end) end
+        if sitEnabled then setupKeybind("Sit", function() end) end
+        if task1Enabled then
+            setupKeybind("Task1Mark", function() end)
+            setupKeybind("Task1Clear", function() end)
+        end
+        if task2Enabled then
+            setupKeybind("Task2Mark", function() end)
+            setupKeybind("Task2Clear", function() end)
+        end
+        if task3Enabled then setupKeybind("Task3Teleport", function() end) end
+        if task5Enabled then
+            setupKeybind("Task5Mark", function() end)
+            setupKeybind("Task5Clear", function() end)
+        end
+        if task6Enabled then
+            setupKeybind("Task6Mark", function() end)
+            setupKeybind("Task6Clear", function() end)
+        end
+        if task7Enabled then
+            setupKeybind("Task7Mark", function() end)
+            setupKeybind("Task7Clear", function() end)
+        end
+        if task8Enabled then setupKeybind("Task8Grip", function() end) end
+        if recordTeleportEnabled then
+            setupKeybind("RecordStart", function() end)
+            setupKeybind("RecordTeleport", function() end)
+        end
+        if infinityEnabled then setupKeybind("InfinityToggle", function() end) end
+    else
+        -- Отключить все кейбинды
+        for name, connection in pairs(keybindConnections) do
+            connection:Disconnect()
+        end
+        keybindConnections = {}
+    end
+    saveSettings()
+end
+
+-- Переменные состояния (все оригинальные переменные сохранены)
+local teleportEnabled = savedSettings and savedSettings.TeleportEnabled or false
+local jumpBoostEnabled = savedSettings and savedSettings.JumpBoostEnabled or false
+local jumpForce = savedSettings and savedSettings.JumpForce or 80
+local antivoidEnabled = savedSettings and savedSettings.AntivoidEnabled or false
+local flingEnabled = false
+local recordTeleportEnabled = false
+local espEnabled = savedSettings and savedSettings.ESPEnabled or false
+local teleportToolEnabled = savedSettings and savedSettings.TeleportToolEnabled or false
+local infinityEnabled = savedSettings and savedSettings.InfinityEnabled or false
+local flyEnabled = savedSettings and savedSettings.FlyEnabled or false
+local noclipEnabled = false
+local infYieldEnabled = savedSettings and savedSettings.InfYieldEnabled or false
+local antiFlingEnabled = savedSettings and savedSettings.AntiFlingEnabled or false
+local ultraInstinctEnabled = savedSettings and savedSettings.UltraInstinctEnabled or false
+local ropeEnabled = savedSettings and savedSettings.RopeEnabled or false
+local autoCraftEnabled = false
+local playerTeleportEnabled = false
+local sitEnabled = savedSettings and savedSettings.SitEnabled or false
+local sitKeybind = savedSettings and savedSettings.SitKeybind or "R"
+local loopWSEnabled = false
+local hoverEnabled = savedSettings and savedSettings.HoverEnabled or false
+
+local task1Enabled = savedSettings and savedSettings.Task1Enabled or false
+local task2Enabled = savedSettings and savedSettings.Task2Enabled or false
+local task3Enabled = savedSettings and savedSettings.Task3Enabled or false
+local task4Enabled = savedSettings and savedSettings.Task4Enabled or false
+local task5Enabled = savedSettings and savedSettings.Task5Enabled or false
+local task6Enabled = savedSettings and savedSettings.Task6Enabled or false
+local task7Enabled = savedSettings and savedSettings.Task7Enabled or false
+local task8Enabled = savedSettings and savedSettings.Task8Enabled or false
+local gripPosX = savedSettings and savedSettings.GripPosX or 0
+local gripPosY = savedSettings and savedSettings.GripPosY or 0
+local gripPosZ = savedSettings and savedSettings.GripPosZ or 0
+
+local autoTeleportItemsEnabled = savedSettings and savedSettings.AutoTeleportItemsEnabled or false
+local autoHitEnabled = savedSettings and savedSettings.AutoHitEnabled or false
+
+local invisiblePlatformEnabled = savedSettings and savedSettings.InvisiblePlatformEnabled or false
+local coordinatesGrabberEnabled = savedSettings and savedSettings.CoordinatesGrabberEnabled or false
+local superRingPartsEnabled = savedSettings and savedSettings.SuperRingPartsEnabled or false
+local signDeleterEnabled = savedSettings and savedSettings.SignDeleterEnabled or false
+local resetOnRespawnEnabled = savedSettings and savedSettings.ResetOnRespawnEnabled or false
+
+-- Все оригинальные переменные соединений
+local teleportConnection = nil
+local positionHistory = {}
+local isTeleporting = false
+local jumpUpdateLoop = nil
+local qConnection = nil
+local zConnection = nil
+local antivoidParts = {}
+local teleportTool = nil
+local flingGUI = nil
+local recordTeleportScript = nil
+local flyGuiConnection = nil
+local noclipConnection = nil
+local infYieldConnection = nil
+local antiFlingConnection = nil
+local ultraInstinctConnection = nil
+local ultraInstinctPart = nil
+local ropeTool = nil
+local autoCraftConnection = nil
+local playerTeleportGUI = nil
+local sitConnection = nil
+local loopWSConnection = nil
+local hoverConnection = nil
+local hoverUI = nil
+local hoverTargetPlayer = nil
+local hoverIsFollowing = false
+
+local task1Connection = nil
+local task1Teleporting = false
+local task1TargetPlayers = {}
+local task1TargetPart = nil
+
+local task2Connection = nil
+local task2Teleporting = false
+local task2TargetPlayers = {}
+local task2TargetPart = nil
+
+local task3Connection = nil
+local task3RagdollParts = nil
+
+local task4Connection = nil
+local task4IsFollowing = false
+local task4Kil = nil
+local task4TutNPC = nil
+local task4Torso = nil
+local task4UpdateConnection = nil
+
+local task5Connection = nil
+local task5Teleporting = false
+local task5TargetPlayers = {}
+local task5TargetPart = nil
+
+local task6Connection = nil
+local task6Teleporting = false
+local task6TargetPlayers = {}
+local task6TargetPart = nil
+
+local task7Connection = nil
+local task7Teleporting = false
+local task7TargetPlayers = {}
+local task7TargetPart = nil
+
+local task8Connection = nil
+
+local infinityAuraPart = nil
+local infinityConnection = nil
+local infinityEnabledState = false
+local infinityDebounce = false
+local infinityCurrentRepelTarget = nil
+local infinityRepelEndTime = 0
+local infinityHitboxCache = {}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local espConnections = {}
+local espGlobalConnections = {}
+
+local autoTeleportItemsConnection = nil
+local autoTeleportItemsActive = false
+local autoTeleportItemsTable = {}
+
+local autoHitConnection = nil
+local autoHitActive = false
+
+local invisiblePlatform = nil
+local coordinatesGrabberGUI = nil
+local superRingPartsGUI = nil
+local signDeleterGUI = nil
+
+local lastPosition = nil
+local isRespawningFromMenu = false
+local resetOnRespawnConnection = nil
+
+-- Все оригинальные вспомогательные функции
+local function isPlayerValid(player)
+    return player and player.Parent and typeof(player) == "Instance" and player:IsA("Player")
+end
+
+local function isCharacterValid(character)
+    return character and character.Parent and typeof(character) == "Instance" and character:IsA("Model")
+end
+
+local function toggleAutoTeleportItems(value)
+    autoTeleportItemsEnabled = value
+    autoTeleportItemsActive = value
+    
+    if autoTeleportItemsConnection then
+        autoTeleportItemsConnection:Disconnect()
+        autoTeleportItemsConnection = nil
+    end
+    
+    if value then
+        local Workspace = game:GetService("Workspace")
+        
+        local function setupObject(object, humanoidRootPart)
+            if not object or not humanoidRootPart then return end
+            
+            object.Transparency = 0.8
+            object.CanCollide = false
+            object.Anchored = true
+            
+            local footPosition = humanoidRootPart.Position - Vector3.new(0, 2, 0)
+            object.CFrame = CFrame.new(footPosition)
+            
+            local touchInterest = object:FindFirstChildOfClass("TouchTransmitter")
+            if touchInterest then
+                touchInterest:Destroy()
+            end
+        end
+
+        local function teleportObjectsToPlayer(folder, player)
+            local character = player.Character
+            if not character then return end
+            
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then return end
+            
+            for _, object in ipairs(folder:GetDescendants()) do
+                if not autoTeleportItemsActive then break end
+                
+                if object:IsA("BasePart") and (object.Name == "Handle" or object.Name:find("Hitbox") or object.Name:find("hitbox")) then
+                    
+                    if autoTeleportItemsTable[object] then
+                        continue
+                    end
+                    
+                    setupObject(object, humanoidRootPart)
+                    
+                    autoTeleportItemsTable[object] = true
+                    
+                    local connection = RunService.Heartbeat:Connect(function()
+                        if not autoTeleportItemsActive or not object or not object.Parent then
+                            connection:Disconnect()
+                            autoTeleportItemsTable[object] = nil
+                            return
+                        end
+                        
+                        if humanoidRootPart and humanoidRootPart.Parent then
+                            local footPosition = humanoidRootPart.Position - Vector3.new(0, 2, 0)
+                            object.CFrame = CFrame.new(footPosition)
+                        end
+                    end)
+                    
+                    table.insert(autoTeleportItemsTable, connection)
+                end
+            end
+        end
+
+        local function handleFolderAdded(folder)
+            if folder.Name == "Folder" and folder:IsA("Folder") then
+                task.wait(0.3)
+                
+                if autoTeleportItemsActive then
+                    teleportObjectsToPlayer(folder, Players.LocalPlayer)
+                end
+            end
+        end
+
+        local function checkExistingFolders()
+            for _, child in ipairs(Workspace:GetChildren()) do
+                if child.Name == "Folder" and child:IsA("Folder") then
+                    handleFolderAdded(child)
+                end
+            end
+        end
+
+        autoTeleportItemsConnection = Workspace.ChildAdded:Connect(function(child)
+            handleFolderAdded(child)
+        end)
+        
+        task.spawn(function()
+            task.wait(1)
+            checkExistingFolders()
+        end)
+        
+    else
+        autoTeleportItemsActive = false
+        for _, connection in pairs(autoTeleportItemsTable) do
+            if typeof(connection) == "RBXScriptConnection" then
+                connection:Disconnect()
+            end
+        end
+        autoTeleportItemsTable = {}
+    end
+    saveSettings()
+end
+
+local function toggleAutoHit(value)
+    autoHitEnabled = value
+    autoHitActive = value
+    
+    if autoHitConnection then
+        autoHitConnection:Disconnect()
+        autoHitConnection = nil
+    end
+    
+    if value then
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local player = Players.LocalPlayer
+
+        local function findHitRequest()
+            local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+            if not remotes then return nil end
+            
+            local hitRequest = remotes:FindFirstChild("HitRequest")
+            if not hitRequest or not hitRequest:IsA("RemoteFunction") then return nil end
+            
+            return hitRequest
+        end
+
+        local function callHitRequest()
+            local hitRequest = findHitRequest()
+            if not hitRequest then return end
+            
+            local success, result = pcall(function()
+                return hitRequest:InvokeServer()
+            end)
+        end
+
+        autoHitConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            if autoHitActive then
+                callHitRequest()
+            end
+        end)
+        
+    else
+        autoHitActive = false
+    end
+    saveSettings()
+end
+
+local function initializeTaskParts()
+    if workspace:FindFirstChild("PoisonParts") then
+        task1TargetPart = workspace.PoisonParts:FindFirstChild("Union")
+        if task1TargetPart then
+            task1TargetPart.Size = Vector3.new(2, 2, 2)
+            task1TargetPart.Position = Vector3.new(0, -1000, 0)
+        end
+    end
+    
+    task2TargetPart = workspace:FindFirstChild("Banana")
+    if task2TargetPart then
+        task2TargetPart.Size = Vector3.new(1, 1, 2)
+        task2TargetPart.Position = Vector3.new(0, -1000, 0)
+    end
+    
+    task3RagdollParts = workspace:FindFirstChild("RagdollParts")
+    
+    task4Kil = workspace:FindFirstChild("Kil")
+    task4TutNPC = workspace:FindFirstChild("TutNPC")
+    if task4TutNPC then
+        task4Torso = task4TutNPC:FindFirstChild("Head")
+    end
+    
+    if workspace:FindFirstChild("RagdollParts") then
+        task5TargetPart = workspace.RagdollParts:FindFirstChild("rea")
+        if task5TargetPart then
+            task5TargetPart.Size = Vector3.new(1, 1, 2)
+            task5TargetPart.Position = Vector3.new(0, -1000, 0)
+        end
+    end
+    
+    if workspace:FindFirstChild("KillParts") then
+        task6TargetPart = workspace.KillParts:FindFirstChild("pee")
+        if task6TargetPart then
+            task6TargetPart.Size = Vector3.new(1, 1, 2)
+            task6TargetPart.Position = Vector3.new(0, -1000, 0)
+        end
+    end
+    
+    task7TargetPart = workspace:FindFirstChild("Kil")
+    if task7TargetPart then
+        task7TargetPart.Size = Vector3.new(1, 1, 2)
+        task7TargetPart.Position = Vector3.new(0, -1000, 0)
+    end
+end
+
+initializeTaskParts()
+
+local function toggleTask1(value)
+    task1Enabled = value
+    
+    if task1Connection then
+        task1Connection:Disconnect()
+        task1Connection = nil
+    end
+    
+    if value then
+        if keybindsEnabled then
+            setupKeybind("Task1Mark", function()
+                local mouse = Players.LocalPlayer:GetMouse()
+                local target = mouse.Target
+                if target then
+                    local selectedPlayer = Players:GetPlayerFromCharacter(target.Parent)
+                    
+                    if selectedPlayer then
+                        if task1TargetPlayers[selectedPlayer] then
+                            task1TargetPlayers[selectedPlayer] = nil
+                            if task1TargetPart then
+                                task1TargetPart.Position = Vector3.new(0, -1000, 0)
+                            end
+                        else
+                            task1TargetPlayers[selectedPlayer] = true
+                        end
+                    end
+                end
+            end)
+            
+            setupKeybind("Task1Clear", function()
+                task1TargetPlayers = {}
+                if task1TargetPart then
+                    task1TargetPart.Position = Vector3.new(0, -1000, 0)
+                end
+            end)
+        end
+        
+        spawn(function()
+            while task1Enabled do
+                if task1TargetPart then
+                    local anyPlayer = next(task1TargetPlayers)
+                    if anyPlayer and anyPlayer.Character and anyPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        task1TargetPart.Position = anyPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 0, 0)
+                    else
+                        task1TargetPart.Position = Vector3.new(0, -1000, 0)
+                    end
+                end
+                wait()
+            end
+        end)
+        
+    else
+        task1TargetPlayers = {}
+        if task1TargetPart then
+            task1TargetPart.Position = Vector3.new(0, -1000, 0)
+        end
+    end
+    saveSettings()
+end
+
+local function toggleTask2(value)
+    task2Enabled = value
+    
+    if task2Connection then
+        task2Connection:Disconnect()
+        task2Connection = nil
+    end
+    
+    if value then
+        if keybindsEnabled then
+            setupKeybind("Task2Mark", function()
+                local mouse = Players.LocalPlayer:GetMouse()
+                local target = mouse.Target
+                if target then
+                    local selectedPlayer = Players:GetPlayerFromCharacter(target.Parent)
+                    
+                    if selectedPlayer then
+                        if task2TargetPlayers[selectedPlayer] then
+                            task2TargetPlayers[selectedPlayer] = nil
+                            if task2TargetPart then
+                                task2TargetPart.Position = Vector3.new(0, -1000, 0)
+                            end
+                        else
+                            task2TargetPlayers[selectedPlayer] = true
+                        end
+                    end
+                end
+            end)
+            
+            setupKeybind("Task2Clear", function()
+                task2TargetPlayers = {}
+                if task2TargetPart then
+                    task2TargetPart.Position = Vector3.new(0, -1000, 0)
+                end
+            end)
+        end
+        
+        spawn(function()
+            while task2Enabled do
+                if task2TargetPart then
+                    local anyPlayer = next(task2TargetPlayers)
+                    if anyPlayer and anyPlayer.Character and anyPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        task2TargetPart.Position = anyPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 0, 0)
+                    else
+                        task2TargetPart.Position = Vector3.new(0, -1000, 0)
+                    end
+                end
+                wait()
+            end
+        end)
+        
+    else
+        task2TargetPlayers = {}
+        if task2TargetPart then
+            task2TargetPart.Position = Vector3.new(0, -1000, 0)
+        end
+    end
+    saveSettings()
+end
+
+local function toggleTask3(value)
+    task3Enabled = value
+    
+    if task3Connection then
+        task3Connection:Disconnect()
+        task3Connection = nil
+    end
+    
+    if value then
+        if keybindsEnabled then
+            setupKeybind("Task3Teleport", function()
+                local targetPart = workspace.RagdollParts:WaitForChild("rea")
+                local player = Players.LocalPlayer
+                if not player or not player.Character then return end
+                
+                local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
+                if not humanoidRootPart then return end
+                
+                local currentPosition = targetPart.Position
+                targetPart.Position = humanoidRootPart.Position
+                wait(2)
+                targetPart.Position = currentPosition
+            end)
+        end
+        
+    else
+        if task3Connection then
+            task3Connection:Disconnect()
+        end
+    end
+    saveSettings()
+end
+
+local function toggleTask4(value)
+    task4Enabled = value
+    
+    if task4Connection then
+        task4Connection:Disconnect()
+        task4Connection = nil
+    end
+    
+    if task4UpdateConnection then
+        task4UpdateConnection:Disconnect()
+        task4UpdateConnection = nil
+    end
+    
+    if value then
+        task4Kil = workspace:FindFirstChild("Kil")
+        task4TutNPC = workspace:FindFirstChild("TutNPC")
+        if task4TutNPC then
+            task4Torso = task4TutNPC:FindFirstChild("Head")
+        end
+        
+        task4Connection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessedEvent)
+            if not gameProcessedEvent and input.KeyCode == Enum.KeyCode.H then
+                if task4IsFollowing then
+                    task4IsFollowing = false
+                    if task4Kil then
+                        task4Kil.Position = Vector3.new(10, 1000, 10)
+                    end
+                else
+                    task4IsFollowing = true
+                end
+            end
+        end)
+        
+        local function updateKilPosition()
+            while task4Enabled and task4IsFollowing do
+                if task4Kil and task4Torso and task4Torso.Parent then
+                    task4Kil.Position = task4Torso.Position + Vector3.new(0, 0, 0)
+                    task4Kil.Size = Vector3.new(1, 1, 1)
+                end
+                wait(0.1)
+            end
+        end
+        
+        task4UpdateConnection = game:GetService("RunService").Heartbeat:Connect(updateKilPosition)
+        
+    else
+        task4IsFollowing = false
+        if task4Kil then
+            task4Kil.Position = Vector3.new(10, 1000, 10)
+        end
+    end
+    saveSettings()
+end
+
+local function toggleTask5(value)
+    task5Enabled = value
+    
+    if task5Connection then
+        task5Connection:Disconnect()
+        task5Connection = nil
+    end
+    
+    if value then
+        if keybindsEnabled then
+            setupKeybind("Task5Mark", function()
+                local mouse = Players.LocalPlayer:GetMouse()
+                local target = mouse.Target
+                if target then
+                    local selectedPlayer = Players:GetPlayerFromCharacter(target.Parent)
+                    
+                    if selectedPlayer then
+                        if task5TargetPlayers[selectedPlayer] then
+                            task5TargetPlayers[selectedPlayer] = nil
+                            if task5TargetPart then
+                                task5TargetPart.Position = Vector3.new(0, -1000, 0)
+                            end
+                        else
+                            task5TargetPlayers[selectedPlayer] = true
+                        end
+                    end
+                end
+            end)
+            
+            setupKeybind("Task5Clear", function()
+                task5TargetPlayers = {}
+                if task5TargetPart then
+                    task5TargetPart.Position = Vector3.new(0, -1000, 0)
+                end
+            end)
+        end
+        
+        spawn(function()
+            while task5Enabled do
+                if task5TargetPart then
+                    local anyPlayer = next(task5TargetPlayers)
+                    if anyPlayer and anyPlayer.Character and anyPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        task5TargetPart.Position = anyPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 0, 0)
+                    else
+                        task5TargetPart.Position = Vector3.new(0, -1000, 0)
+                    end
+                end
+                wait()
+            end
+        end)
+        
+    else
+        task5TargetPlayers = {}
+        if task5TargetPart then
+            task5TargetPart.Position = Vector3.new(0, -1000, 0)
+        end
+    end
+    saveSettings()
+end
+
+local function toggleTask6(value)
+    task6Enabled = value
+    
+    if task6Connection then
+        task6Connection:Disconnect()
+        task6Connection = nil
+    end
+    
+    if value then
+        if keybindsEnabled then
+            setupKeybind("Task6Mark", function()
+                local mouse = Players.LocalPlayer:GetMouse()
+                local target = mouse.Target
+                if target then
+                    local selectedPlayer = Players:GetPlayerFromCharacter(target.Parent)
+                    
+                    if selectedPlayer then
+                        if task6TargetPlayers[selectedPlayer] then
+                            task6TargetPlayers[selectedPlayer] = nil
+                            if task6TargetPart then
+                                task6TargetPart.Position = Vector3.new(0, -1000, 0)
+                            end
+                        else
+                            task6TargetPlayers[selectedPlayer] = true
+                        end
+                    end
+                end
+            end)
+            
+            setupKeybind("Task6Clear", function()
+                task6TargetPlayers = {}
+                if task6TargetPart then
+                    task6TargetPart.Position = Vector3.new(0, -1000, 0)
+                end
+            end)
+        end
+        
+        spawn(function()
+            while task6Enabled do
+                if task6TargetPart then
+                    local anyPlayer = next(task6TargetPlayers)
+                    if anyPlayer and anyPlayer.Character and anyPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        task6TargetPart.Position = anyPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 0, 0)
+                    else
+                        task6TargetPart.Position = Vector3.new(0, -1000, 0)
+                    end
+                end
+                wait()
+            end
+        end)
+        
+    else
+        task6TargetPlayers = {}
+        if task6TargetPart then
+            task6TargetPart.Position = Vector3.new(0, -1000, 0)
+        end
+    end
+    saveSettings()
+end
+
+local function toggleTask7(value)
+    task7Enabled = value
+    
+    if task7Connection then
+        task7Connection:Disconnect()
+        task7Connection = nil
+    end
+    
+    if value then
+        task7TargetPart = workspace:FindFirstChild("Kil")
+        
+        if not task7TargetPart then
+            Fluent:Notify({
+                Title = "Ошибка задачи 7",
+                Content = "Kil не найден в workspace",
+                Duration = 3
+            })
+            return
+        end
+        
+        if keybindsEnabled then
+            setupKeybind("Task7Mark", function()
+                local mouse = Players.LocalPlayer:GetMouse()
+                local target = mouse.Target
+                if target then
+                    local selectedPlayer = Players:GetPlayerFromCharacter(target.Parent)
+                    
+                    if selectedPlayer then
+                        if task7TargetPlayers[selectedPlayer] then
+                            task7TargetPlayers[selectedPlayer] = nil
+                            if task7TargetPart then
+                                task7TargetPart.Position = Vector3.new(0, -1000, 100)
+                            end
+                            Fluent:Notify({
+                                Title = "Kil Mark",
+                                Content = "Отметка снята",
+                                Duration = 2
+                            })
+                        else
+                            task7TargetPlayers[selectedPlayer] = true
+                            
+                            Fluent:Notify({
+                                Title = "Kil Mark",
+                                Content = "Игрок отмечен: " .. selectedPlayer.Name,
+                                Duration = 2
+                            })
+                            
+                            spawn(function()
+                                while task7Teleporting and task7Enabled do
+                                    if task7TargetPlayer and task7TargetPlayer.Character and task7TargetPlayer.Character:FindFirstChild("Torso") and task7TargetPart then
+                                        task7TargetPart.Position = task7TargetPlayer.Character.Torso.Position + Vector3.new(0, 2, 0)
+                                    end
+                                    wait()
+                                end
+                            end)
+                        end
+                    end
+                end
+            end)
+            
+            setupKeybind("Task7Clear", function()
+                task7TargetPlayers = {}
+                if task7TargetPart then
+                    task7TargetPart.Position = Vector3.new(0, -1000, 100)
+                end
+                Fluent:Notify({
+                    Title = "Kil Mark",
+                    Content = "Все метки очищены",
+                    Duration = 2
+                })
+            end)
+        end
+        
+        Fluent:Notify({
+            Title = "Задача 7 активирована",
+            Content = "Нажмите H на игроке для отметки Kil",
+            Duration = 3
+        })
+    else
+        task7Teleporting = false
+        task7TargetPlayers = {}
+        if task7TargetPart then
+            task7TargetPart.Position = Vector3.new(0, -1000, 100)
+        end
+        Fluent:Notify({
+            Title = "Задача 7 деактивирована",
+            Content = "Отметка Kil отключена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleTask8(value)
+    task8Enabled = value
+    
+    if task8Connection then
+        task8Connection:Disconnect()
+        task8Connection = nil
+    end
+    
+    if value then
+        if keybindsEnabled then
+            setupKeybind("Task8Grip", function()
+                local player = game.Players.LocalPlayer
+                if player and player.Character then
+                    local tool = player.Character:FindFirstChildOfClass("Tool")
+                    if tool and tool:FindFirstChild("Handle") then
+                        local handle = tool.Handle
+                        
+                        local bodyPosition = handle:FindFirstChild("GripBodyPosition") or Instance.new("BodyPosition")
+                        bodyPosition.Name = "GripBodyPosition"
+                        bodyPosition.P = 10000
+                        bodyPosition.D = 1000
+                        bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                        bodyPosition.Position = player.Character.Head.Position + Vector3.new(gripPosX, gripPosY, gripPosZ)
+                        bodyPosition.Parent = handle
+                    end
+                end
+            end)
+        end
+    end
+    saveSettings()
+end
+
+local function toggleResetOnRespawn(value)
+    resetOnRespawnEnabled = value
+    
+    if resetOnRespawnConnection then
+        resetOnRespawnConnection:Disconnect()
+        resetOnRespawnConnection = nil
+    end
+    
+    if value then
+        local Players = game:GetService("Players")
+        local player = Players.LocalPlayer
+
+        lastPosition = nil
+        isRespawningFromMenu = false
+
+        local function teleportToPosition(character, position)
+            if not character or not character.Parent then
+                return false
+            end
+            
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if not rootPart then
+                return false
+            end
+            
+            if position and typeof(position) == "Vector3" then
+                character:SetPrimaryPartCFrame(CFrame.new(position))
+                return true
+            end
+            
+            return false
+        end
+
+        local function onCharacterAdded(character)
+            if not character then return end
+            
+            local rootPart = character:WaitForChild("HumanoidRootPart", 5)
+            if not rootPart then
+                return
+            end
+            
+            character.PrimaryPart = rootPart
+            
+            wait(0.1)
+            
+            if lastPosition and isRespawningFromMenu then
+                local success = teleportToPosition(character, lastPosition)
+                if success then
+                    lastPosition = nil
+                end
+            end
+            
+            isRespawningFromMenu = false
+            
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.Died:Connect(function()
+                end)
+            end
+        end
+
+        local function setupRespawnHandler()
+            player.CharacterRemoving:Connect(function(character)
+                if character and character:FindFirstChild("HumanoidRootPart") then
+                    local humanoid = character:FindFirstChild("Humanoid")
+                    if humanoid and humanoid.Health > 0 then
+                        lastPosition = character.HumanoidRootPart.Position
+                        isRespawningFromMenu = true
+                    else
+                        isRespawningFromMenu = false
+                        lastPosition = nil
+                    end
+                end
+            end)
+            
+            local guiService = game:GetService("GuiService")
+            guiService.MenuOpened:Connect(function()
+                guiService.MenuClosed:Connect(function()
+                    wait(0.1)
+                end)
+            end)
+        end
+
+        player.CharacterAdded:Connect(onCharacterAdded)
+        setupRespawnHandler()
+        
+        Fluent:Notify({
+            Title = "Ресет на месте активирован",
+            Content = "При респавне через меню вы останетесь на месте",
+            Duration = 3
+        })
+    else
+        lastPosition = nil
+        isRespawningFromMenu = false
+        Fluent:Notify({
+            Title = "Ресет на месте деактивирован",
+            Content = "Функция ресета на месте отключена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleAntivoid(value)
+    antivoidEnabled = value
+    
+    if value then
+        local antivoidPosition = Vector3.new(-75.03204345703125, 2047, 105.49022674560547)
+        local antivoidSize = Vector3.new(100000, 1, 100000)
+
+        local antivoidPart = Instance.new("Part")
+        antivoidPart.Size = antivoidSize
+        antivoidPart.Position = antivoidPosition
+        antivoidPart.Anchored = true
+        antivoidPart.BrickColor = BrickColor.new("Dark Stone Grey")
+        antivoidPart.Name = "antivoid"
+        antivoidPart.Transparency = 1
+        antivoidPart.CanCollide = true
+        antivoidPart.CanQuery = true
+        antivoidPart.Massless = true
+        antivoidPart.Parent = workspace
+        table.insert(antivoidParts, antivoidPart)
+    else
+        for _, part in ipairs(antivoidParts) do
+            if part and part.Parent then
+                pcall(function() part:Destroy() end)
+            end
+        end
+        antivoidParts = {}
+    end
+    saveSettings()
+end
+
+local function teleportToPosition(position)
+    local player = game.Players.LocalPlayer
+    if not isPlayerValid(player) or not player.Character then return end
+    
+    local character = player.Character
+    if not isCharacterValid(character) then return end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    
+    if humanoid then
+        local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+        if rootPart then
+            local currentVelocity = rootPart.Velocity
+            local currentRotVelocity = rootPart.RotVelocity
+            
+            local safePosition = position
+            if safePosition.Y < 2000 then
+                safePosition = Vector3.new(safePosition.X, 2050, safePosition.Z)
+            end
+            
+            pcall(function()
+                rootPart.CFrame = CFrame.new(safePosition) + Vector3.new(0, 3, 0)
+                rootPart.Velocity = currentVelocity
+                rootPart.RotVelocity = currentRotVelocity
+            end)
+        end
+    else
+        local parts = {}
+        local totalMass = 0
+        local centerOfMass = Vector3.new(0, 0, 0)
+        
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                table.insert(parts, part)
+                local mass = part:GetMass()
+                centerOfMass = centerOfMass + part.Position * mass
+                totalMass = totalMass + mass
+            end
+        end
+        
+        if totalMass > 0 then
+            centerOfMass = centerOfMass / totalMass
+        end
+        
+        local offset = position - centerOfMass
+        
+        for _, part in pairs(parts) do
+            local currentVelocity = part.Velocity
+            local currentRotVelocity = part.RotVelocity
+            
+            pcall(function()
+                part.CFrame = CFrame.new(part.Position + offset)
+                part.Velocity = currentVelocity
+                part.RotVelocity = currentRotVelocity
+            end)
+        end
+    end
+    
+    pcall(function()
+        local effect = Instance.new("Part")
+        effect.Size = Vector3.new(3, 3, 3)
+        effect.Position = position
+        effect.Anchored = true
+        effect.CanCollide = false
+        effect.Transparency = 0.7
+        effect.Material = Enum.Material.Neon
+        effect.Color = Color3.fromRGB(0, 170, 255)
+        effect.Parent = workspace
+        game:GetService("Debris"):AddItem(effect, 1)
+    end)
+end
+
+local function createTeleportTool()
+    local player = game.Players.LocalPlayer
+    if not isPlayerValid(player) then return nil end
+    
+    if teleportTool and teleportTool.Parent then
+        pcall(function() teleportTool:Destroy() end)
+    end
+    
+    local mouse = player:GetMouse()
+    local tool = Instance.new("Tool")
+    tool.RequiresHandle = false
+    tool.Name = "фхз пидорасы"
+    tool.Activated:connect(function()
+        if not isPlayerValid(player) or not player.Character then return end
+        
+        local pos = mouse.Hit + Vector3.new(0, 2.5, 0)
+        pos = CFrame.new(pos.X, pos.Y, pos.Z)
+        
+        pcall(function()
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                player.Character.HumanoidRootPart.CFrame = pos
+                
+                local effect = Instance.new("Part")
+                effect.Size = Vector3.new(2, 2, 2)
+                effect.Position = player.Character.HumanoidRootPart.Position
+                effect.Anchored = true
+                effect.CanCollide = false
+                effect.Transparency = 0.5
+                effect.Material = Enum.Material.Neon
+                effect.Color = Color3.fromRGB(0, 255, 255)
+                effect.Parent = workspace
+                game:GetService("Debris"):AddItem(effect, 1)
+            end
+        end)
+    end)
+    
+    if player:FindFirstChild("Backpack") then
+        tool.Parent = player.Backpack
+    end
+    
+    return tool
+end
+
+local function setupTeleportToolAutoGive()
+    local player = game.Players.LocalPlayer
+    if not isPlayerValid(player) then return end
+    
+    player.CharacterAdded:Connect(function(character)
+        if teleportToolEnabled and isCharacterValid(character) then
+            task.wait(2)
+            teleportTool = createTeleportTool()
+        end
+    end)
+end
+
+local function initializeTeleportScript()
+    local Players = game:GetService("Players")
+    local UserInputService = game:GetService("UserInputService")
+    local RunService = game:GetService("RunService")
+
+    local player = Players.LocalPlayer
+    if not isPlayerValid(player) then return end
+    
+    local character = player.Character
+    if not character then
+        character = player.CharacterAdded:Wait()
+        if not isCharacterValid(character) then return end
+    end
+
+    local TELEPORT_POSITION = Vector3.new(-73.6433334350586, 2050.374755859375, 105.57916259765625)
+    local TELEPORT_DELAY = 0.2
+    local POSITION_HISTORY_DURATION = 0.1
+
+    local function savePosition()
+        if isTeleporting or not isCharacterValid(character) then return end
+        
+        local currentTime = os.clock()
+        local currentPosition = Vector3.new(0, 0, 0)
+        local partCount = 0
+        
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                currentPosition = currentPosition + part.Position
+                partCount = partCount + 1
+            end
+        end
+        
+        if partCount > 0 then
+            currentPosition = currentPosition / partCount
+            
+            table.insert(positionHistory, {
+                time = currentTime,
+                position = currentPosition
+            })
+            
+            if #positionHistory > 100 then
+                table.remove(positionHistory, 1)
+            end
+            
+            for i = #positionHistory, 1, -1 do
+                if currentTime - positionHistory[i].time > POSITION_HISTORY_DURATION then
+                    table.remove(positionHistory, i)
+                end
+            end
+        end
+    end
+
+    local function getPositionOneSecondAgo()
+        if #positionHistory == 0 then
+            if not isCharacterValid(character) then return Vector3.new(0, 0, 0) end
+            
+            local avgPosition = Vector3.new(0, 0, 0)
+            local partCount = 0
+            
+            for _, part in pairs(character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    avgPosition = avgPosition + part.Position
+                    partCount = partCount + 1
+                end
+            end
+            
+            return partCount > 0 and (avgPosition / partCount) or Vector3.new(0, 0, 0)
+        end
+        
+        local targetTime = os.clock() - 1
+        local closestPosition = positionHistory[1].position
+        
+        for i = 1, #positionHistory do
+            if positionHistory[i].time <= targetTime then
+                closestPosition = positionHistory[i].position
+            else
+                break
+            end
+        end
+        
+        return closestPosition
+    end
+
+    local function performTeleport()
+        if isTeleporting or not teleportEnabled or not isPlayerValid(player) then return end
+        isTeleporting = true
+        
+        local returnPosition = getPositionOneSecondAgo()
+        
+        teleportToPosition(TELEPORT_POSITION)
+        
+        task.wait(TELEPORT_DELAY)
+        
+        teleportToPosition(returnPosition)
+        
+        isTeleporting = false
+    end
+
+    if teleportConnection then
+        teleportConnection:Disconnect()
+    end
+
+    local lastSaveTime = 0
+    teleportConnection = RunService.Heartbeat:Connect(function()
+        if teleportEnabled and isPlayerValid(player) then
+            local currentTime = os.clock()
+            if currentTime - lastSaveTime >= 0.05 then
+                lastSaveTime = currentTime
+                pcall(savePosition)
+            end
+        end
+    end)
+
+    if keybindsEnabled then
+        setupKeybind("Teleport", performTeleport)
+    end
+
+    player.CharacterAdded:Connect(function(newCharacter)
+        if isCharacterValid(newCharacter) then
+            character = newCharacter
+            positionHistory = {}
+            isTeleporting = false
+        end
+    end)
+end
+
+local function setJumpForce(force)
+    local player = game.Players.LocalPlayer
+    if isPlayerValid(player) and player.Character and player.Character:FindFirstChild("Humanoid") then
+        pcall(function()
+            player.Character.Humanoid.JumpPower = force
+        end)
+    end
+end
+
+local function startForceUpdate()
+    if jumpUpdateLoop then
+        jumpUpdateLoop:Disconnect()
+    end
+    
+    local lastUpdate = 0
+    jumpUpdateLoop = game:GetService("RunService").Heartbeat:Connect(function()
+        local currentTime = os.clock()
+        if currentTime - lastUpdate >= 0.1 then
+            lastUpdate = currentTime
+            if jumpBoostEnabled and isPlayerValid(game.Players.LocalPlayer) then
+                pcall(function() setJumpForce(jumpForce) end)
+            end
+        end
+    end)
+end
+
+local function stopForceUpdate()
+    if jumpUpdateLoop then
+        jumpUpdateLoop:Disconnect()
+        jumpUpdateLoop = nil
+    end
+end
+
+local function initializeJumpBoostScript()
+    if keybindsEnabled then
+        setupKeybind("JumpBoostOn", function()
+            if jumpBoostEnabled and isPlayerValid(game.Players.LocalPlayer) then
+                pcall(startForceUpdate)
+            end
+        end)
+        
+        setupKeybind("JumpBoostOff", function()
+            if jumpBoostEnabled and isPlayerValid(game.Players.LocalPlayer) then
+                pcall(function()
+                    stopForceUpdate()
+                    setJumpForce(50)
+                end)
+            end
+        end)
+    end
+    
+    game.Players.LocalPlayer.CharacterAdded:Connect(function()
+        if jumpBoostEnabled and isPlayerValid(game.Players.LocalPlayer) then
+            pcall(function()
+                stopForceUpdate()
+                setJumpForce(50)
+            end)
+        end
+    end)
+end
+
+local function createFlingGUI()
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/K1LAS1K/Ultimate-Fling-GUI/main/flingscript.lua"))()
+    end)
+    
+    if success then
+        Fluent:Notify({
+            Title = "Fling GUI загружен",
+            Content = "Ultimate Fling GUI активирован",
+            Duration = 3
+        })
+        return result
+    else
+        Fluent:Notify({
+            Title = "Ошибка загрузки",
+            Content = "Не удалось загрузить Fling GUI",
+            Duration = 3
+        })
+        return nil
+    end
+end
+
+local function closeFlingGUI()
+    local coreGui = game:GetService("CoreGui")
+    local screenGuis = coreGui:GetChildren()
+    
+    for _, gui in ipairs(screenGuis) do
+        if gui:IsA("ScreenGui") and (gui.Name:find("Fling") or gui.Name:find("Kilasik") or gui.Name:find("K1LAS1K")) then
+            pcall(function() gui:Destroy() end)
+        end
+    end
+    
+    Fluent:Notify({
+        Title = "Fling GUI отключен",
+        Content = "Ultimate Fling GUI деактивирован",
+        Duration = 3
+    })
+end
+
+local flingGUIInstance = nil
+
+local function createRecordTeleportScript()
+    local Records = {}
+    local IsRecording = false
+    local CanUse = true
+
+    local function RecordPosition()
+        local player = game.Players.LocalPlayer
+        if not isPlayerValid(player) or not player.Character then return end
+        
+        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            table.insert(Records, {
+                Position = hrp.Position,
+                CFrame = hrp.CFrame,
+                Timestamp = tick()
+            })
+            
+            if #Records > 1000 then
+                table.remove(Records, 1)
+            end
+        end
+    end
+
+    local function ToggleRecording()
+        if not CanUse then return end
+        
+        IsRecording = not IsRecording
+        
+        if IsRecording then
+            Records = {}
+            
+            task.spawn(function()
+                while IsRecording and isPlayerValid(game.Players.LocalPlayer) do
+                    RecordPosition()
+                    task.wait(0.2)
+                end
+            end)
+        end
+    end
+
+    local function TeleportToRecordedPosition()
+        if not CanUse or #Records == 0 or IsRecording or not isPlayerValid(game.Players.LocalPlayer) then return end
+        
+        CanUse = false
+        
+        local player = game.Players.LocalPlayer
+        if player and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            
+            if hrp and humanoid then
+                pcall(function()
+                    hrp.CFrame = Records[#Records].CFrame
+                    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+                    
+                    local effect = Instance.new("Part")
+                    effect.Size = Vector3.new(5, 5, 5)
+                    effect.Position = hrp.Position
+                    effect.Anchored = true
+                    effect.Transparency = 0.5
+                    effect.BrickColor = BrickColor.new("Red")
+                    effect.Material = Enum.Material.Neon
+                    effect.CanCollide = false
+                    effect.Parent = workspace
+                    
+                    game:GetService("TweenService"):Create(effect, TweenInfo.new(0.5), {
+                        Transparency = 1,
+                        Size = Vector3.new(10, 10, 10)
+                    }):Play()
+                    
+                    game.Debris:AddItem(effect, 1)
+                end)
+            end
+        end
+        task.wait(0.1)
+        CanUse = true
+    end
+
+    if keybindsEnabled then
+        setupKeybind("RecordStart", ToggleRecording)
+        setupKeybind("RecordTeleport", TeleportToRecordedPosition)
+    end
+
+    return true
+end
+
+local function toggleNoclip(value)
+    noclipEnabled = value
+    
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+    
+    if value then
+        local lastCheck = 0
+        noclipConnection = game:GetService("RunService").Stepped:Connect(function()
+            local currentTime = os.clock()
+            if currentTime - lastCheck >= 0.1 then
+                lastCheck = currentTime
+                local player = game.Players.LocalPlayer
+                if isPlayerValid(player) and player.Character then
+                    for _, part in pairs(player.Character:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            pcall(function() part.CanCollide = false end)
+                        end
+                    end
+                end
+            end
+        end)
+    else
+        local player = game.Players.LocalPlayer
+        if isPlayerValid(player) and player.Character then
+            for _, part in pairs(player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    pcall(function() part.CanCollide = true end)
+                end
+            end
+        end
+    end
+end
+
+local function toggleInfYield(value)
+    infYieldEnabled = value
+    
+    if value then
+        local success, result = pcall(function()
+            loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+        end)
+        
+        if success then
+            Fluent:Notify({
+                Title = "Infinite Yield активирован",
+                Content = "Нажмите F9 для открытия меню",
+                Duration = 3
+            })
+        else
+            Fluent:Notify({
+                Title = "Ошибка Infinite Yield",
+                Content = "Не удалось загрузить Infinite Yield",
+                Duration = 3
+            })
+        end
+    else
+        Fluent:Notify({
+            Title = "Infinite Yield",
+            Content = "Перезайдите в игру для полного отключения",
+            Duration = 3
+        })
+    end
+    saveSettings()
+end
+
+local function toggleAntiFling(value)
+    antiFlingEnabled = value
+    
+    if antiFlingConnection then
+        antiFlingConnection:Disconnect()
+        antiFlingConnection = nil
+    end
+    
+    if value then
+        antiFlingConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            local player = game.Players.LocalPlayer
+            if isPlayerValid(player) and player.Character then
+                local rootPart = player.Character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    local velocity = rootPart.Velocity
+                    if velocity.Magnitude > 100 then
+                        rootPart.Velocity = Vector3.new(0, velocity.Y, 0)
+                    end
+                end
+            end
+        end)
+        Fluent:Notify({
+            Title = "Anti-Fling активирован",
+            Content = "Защита от флинга включена (Infinity Yield метод)",
+            Duration = 2
+        })
+    else
+        Fluent:Notify({
+            Title = "Anti-Fling отключен",
+            Content = "Защита от флинга выключена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleInfinity(value)
+    infinityEnabled = value
+    
+    if infinityConnection then
+        infinityConnection:Disconnect()
+        infinityConnection = nil
+    end
+    
+    if infinityAuraPart and infinityAuraPart.Parent then
+        pcall(function() infinityAuraPart:Destroy() end)
+        infinityAuraPart = nil
+    end
+    
+    if value then
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local UserInputService = game:GetService("UserInputService")
+        local TweenService = game:GetService("TweenService")
+
+        local localPlayer = Players.LocalPlayer
+        if not isPlayerValid(localPlayer) then return end
+        
+        local character = localPlayer.Character
+        if not character then
+            character = localPlayer:WaitForChild("CharacterAdded"):Wait()
+            if not isCharacterValid(character) then return end
+        end
+        
+        local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+        local AURA_RADIUS = 7
+        local AURA_HEIGHT_OFFSET = 5
+        local BASE_REPEL_FORCE = 80
+        local MAX_REPEL_FORCE = 150
+        local SMOOTH_FACTOR = 0.3
+        local REPEL_DURATION = 2
+        local AURA_RADIUS_SQUARED = AURA_RADIUS * AURA_RADIUS
+
+        local infinityAuraPart = nil
+        local infinityHitboxCache = {}
+        local activeRepels = {}
+        local lastPositions = {}
+        local lastToggleTime = 0
+
+        local function createAura()
+            if infinityAuraPart and infinityAuraPart.Parent then
+                infinityAuraPart:Destroy()
+            end
+            
+            infinityAuraPart = Instance.new("Part")
+            infinityAuraPart.Name = "InfinityAuraPart"
+            infinityAuraPart.Size = Vector3.new(AURA_RADIUS * 2, AURA_RADIUS * 2 + AURA_HEIGHT_OFFSET, AURA_RADIUS * 2)
+            infinityAuraPart.Transparency = 1
+            infinityAuraPart.CanCollide = false
+            infinityAuraPart.Anchored = true
+            infinityAuraPart.CastShadow = false
+            infinityAuraPart.Parent = character
+            
+            return infinityAuraPart
+        end
+
+        local function preloadHitboxes()
+            infinityHitboxCache = {}
+            
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= localPlayer and player.Character then
+                    local character = player.Character
+                    
+                    local leftArmHit = character:FindFirstChild("Left Arm_hit")
+                    local rightArmHit = character:FindFirstChild("Right Arm_hit")
+                    
+                    if leftArmHit and leftArmHit:IsA("BasePart") then
+                        infinityHitboxCache[leftArmHit] = {
+                            instance = leftArmHit,
+                            owner = player,
+                            lastCollisionTime = 0,
+                            position = leftArmHit.Position
+                        }
+                    end
+                    
+                    if rightArmHit and rightArmHit:IsA("BasePart") then
+                        infinityHitboxCache[rightArmHit] = {
+                            instance = rightArmHit,
+                            owner = player,
+                            lastCollisionTime = 0,
+                            position = rightArmHit.Position
+                        }
+                    end
+                    
+                    for _, part in pairs(character:GetDescendants()) do
+                        if part:IsA("BasePart") and part.Name:find("_hit") then
+                            if part ~= leftArmHit and part ~= rightArmHit then
+                                infinityHitboxCache[part] = {
+                                    instance = part,
+                                    owner = player,
+                                    lastCollisionTime = 0,
+                                    position = part.Position
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        local function setupHitboxListeners()
+            workspace.DescendantAdded:Connect(function(descendant)
+                if descendant:IsA("BasePart") and (descendant.Name == "Left Arm_hit" or descendant.Name == "Right Arm_hit") then
+                    local parent = descendant.Parent
+                    if parent and parent:IsA("Model") then
+                        local player = Players:GetPlayerFromCharacter(parent)
+                        if player and player ~= localPlayer then
+                            infinityHitboxCache[descendant] = {
+                                instance = descendant,
+                                owner = player,
+                                lastCollisionTime = 0,
+                                position = descendant.Position
+                            }
+                        end
+                    end
+                end
+            end)
+            
+            workspace.DescendantRemoving:Connect(function(descendant)
+                if infinityHitboxCache[descendant] then
+                    infinityHitboxCache[descendant] = nil
+                end
+            end)
+            
+            RunService.Heartbeat:Connect(function()
+                if not infinityEnabled then return end
+                
+                for hitbox, data in pairs(infinityHitboxCache) do
+                    if hitbox:IsDescendantOf(workspace) then
+                        data.position = hitbox.Position
+                    else
+                        infinityHitboxCache[hitbox] = nil
+                    end
+                end
+            end)
+        end
+
+        local function isInAura(position, centerPosition)
+            local delta = position - centerPosition
+            return delta.X * delta.X + delta.Y * delta.Y + delta.Z * delta.Z <= AURA_RADIUS_SQUARED
+        end
+
+        local function applySmoothRepelForce(targetPlayer, hitboxPosition, currentTime)
+            if not humanoidRootPart or not targetPlayer or not targetPlayer.Character then return end
+            
+            local targetCharacter = targetPlayer.Character
+            local targetRoot = targetCharacter:FindFirstChild("HumanoidRootPart")
+            
+            if not targetRoot then return end
+            
+            local distance = (humanoidRootPart.Position - hitboxPosition).Magnitude
+            local normalizedDistance = math.clamp(distance / AURA_RADIUS, 0, 1)
+            
+            local distanceFactor = 1 - normalizedDistance
+            local repelForce = BASE_REPEL_FORCE + (MAX_REPEL_FORCE - BASE_REPEL_FORCE) * distanceFactor
+            
+            local direction = (humanoidRootPart.Position - hitboxPosition).Unit
+            local repelVelocity = direction * repelForce
+            
+            local currentVelocity = humanoidRootPart.Velocity
+            
+            local newVelocity = currentVelocity:Lerp(repelVelocity, SMOOTH_FACTOR)
+            
+            humanoidRootPart.Velocity = newVelocity
+            
+            spawn(function()
+                local effect = Instance.new("Part")
+                effect.Size = Vector3.new(1, 1, 1)
+                effect.Position = hitboxPosition
+                effect.Anchored = true
+                effect.CanCollide = false
+                effect.Transparency = 0.7
+                effect.Material = Enum.Material.Neon
+                effect.BrickColor = BrickColor.new("Bright blue")
+                effect.Parent = workspace
+                
+                local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                local tween = TweenService:Create(effect, tweenInfo, {Transparency = 1, Size = Vector3.new(3, 3, 3)})
+                tween:Play()
+                
+                game:GetService("Debris"):AddItem(effect, 1)
+            end)
+        end
+
+        local function canRepelAgain(hitboxData, currentTime)
+            if not hitboxData then return true end
+            
+            local timeSinceLastCollision = currentTime - hitboxData.lastCollisionTime
+            return timeSinceLastCollision > 0.1
+        end
+
+        local function cleanupOldRepels(currentTime)
+            for player, repelData in pairs(activeRepels) do
+                if currentTime - repelData.startTime > REPEL_DURATION then
+                    activeRepels[player] = nil
+                end
+            end
+        end
+
+        local function checkCollisionsEveryFrame()
+            if not humanoidRootPart then return end
+            
+            local currentTime = os.clock()
+            local currentPos = humanoidRootPart.Position
+            
+            lastPositions[humanoidRootPart] = currentPos
+            
+            cleanupOldRepels(currentTime)
+            
+            for hitbox, data in pairs(infinityHitboxCache) do
+                if hitbox:IsDescendantOf(workspace) and data.owner and data.owner.Character then
+                    local hitboxPos = data.position or hitbox.Position
+                    
+                    if isInAura(hitboxPos, currentPos) then
+                        local hitboxOwner = data.owner
+                        if hitboxOwner and hitboxOwner ~= localPlayer then
+                            if canRepelAgain(data, currentTime) then
+                                applySmoothRepelForce(hitboxOwner, hitboxPos, currentTime)
+                                data.lastCollisionTime = currentTime
+                            end
+                        end
+                    end
+                else
+                    infinityHitboxCache[hitbox] = nil
+                end
+            end
+        end
+
+        infinityAuraPart = createAura()
+        
+        preloadHitboxes()
+        setupHitboxListeners()
+        
+        infinityConnection = RunService.Heartbeat:Connect(function()
+            if not infinityEnabled or not infinityAuraPart or not humanoidRootPart then return end
+            
+            infinityAuraPart.Position = humanoidRootPart.Position
+            
+            checkCollisionsEveryFrame()
+        end)
+
+        localPlayer.CharacterAdded:Connect(function(newCharacter)
+            character = newCharacter
+            humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+            
+            if infinityEnabled then
+                toggleInfinity(false)
+                task.wait(0.5)
+                toggleInfinity(true)
+            end
+        end)
+
+        if keybindsEnabled then
+            setupKeybind("InfinityToggle", function()
+                local currentTime = tick()
+                if currentTime - lastToggleTime < 0.1 then
+                    return
+                end
+                lastToggleTime = currentTime
+                
+                infinityEnabled = not infinityEnabled
+                toggleInfinity(infinityEnabled)
+            end)
+        end
+
+        spawn(function()
+            while true do
+                task.wait(10)
+                if infinityEnabled and (not infinityConnection or not infinityAuraPart or not infinityAuraPart.Parent) then
+                    toggleInfinity(false)
+                    task.wait(0.1)
+                    toggleInfinity(true)
+                end
+            end
+        end)
+
+        Fluent:Notify({
+            Title = "Infinity активирован",
+            Content = "Аура отталкивания включена",
+            Duration = 2
+        })
+    else
+        Fluent:Notify({
+            Title = "Infinity деактивирован",
+            Content = "Аура отталкивания выключена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleUltraInstinct(value)
+    ultraInstinctEnabled = value
+    
+    if ultraInstinctConnection then
+        ultraInstinctConnection:Disconnect()
+        ultraInstinctConnection = nil
+    end
+    
+    if ultraInstinctPart and ultraInstinctPart.Parent then
+        pcall(function() ultraInstinctPart:Destroy() end)
+        ultraInstinctPart = nil
+    end
+    
+    if value then
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+
+        local player = Players.LocalPlayer
+        if not isPlayerValid(player) then return end
+        
+        local character = player.Character
+        if not character then
+            character = player:WaitForChild("CharacterAdded"):Wait()
+            if not isCharacterValid(character) then return end
+        end
+        
+        local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+        local AURA_RADIUS = 15
+        local REPEL_FORCE = 65
+        local REPEL_DURATION = 30
+        local AURA_RADIUS_SQUARED = AURA_RADIUS * AURA_RADIUS
+        local CHECK_INTERVAL = 0.1
+
+        local auraPart = nil
+        local debounce = false
+        local currentRepelTarget = nil
+        local repelEndTime = 0
+        local hitboxCache = {}
+        local lastCheckTime = 0
+
+        local function createAura()
+            if ultraInstinctPart and ultraInstinctPart.Parent then
+                pcall(function() ultraInstinctPart:Destroy() end)
+            end
+            
+            ultraInstinctPart = Instance.new("Part")
+            ultraInstinctPart.Name = "UltraInstinctAuraPart"
+            ultraInstinctPart.Size = Vector3.new(AURA_RADIUS * 3, AURA_RADIUS * 1.5, AURA_RADIUS * 3)
+            ultraInstinctPart.Transparency = 1
+            ultraInstinctPart.CanCollide = false
+            ultraInstinctPart.Anchored = true
+            ultraInstinctPart.CastShadow = false
+            ultraInstinctPart.Parent = character
+            
+            return ultraInstinctPart
+        end
+
+        local function preloadHitboxes()
+            hitboxCache = {}
+            for _, hitbox in ipairs(workspace:GetDescendants()) do
+                if hitbox.Name == "Hitbox" and hitbox:IsA("BasePart") then
+                    local parent = hitbox.Parent
+                    if parent and parent:IsA("Model") and parent ~= character then
+                        local playerFromModel = Players:GetPlayerFromCharacter(parent)
+                        if playerFromModel and isPlayerValid(playerFromModel) then
+                            hitboxCache[hitbox] = {
+                                instance = hitbox,
+                                owner = playerFromModel,
+                                position = hitbox.Position
+                            }
+                        end
+                    end
+                end
+            end
+        end
+
+        local function setupHitboxListeners()
+            workspace.DescendantAdded:Connect(function(descendant)
+                if descendant.Name == "Hitbox" and descendant:IsA("BasePart") then
+                    local parent = descendant.Parent
+                    if parent and parent:IsA("Model") and parent ~= character then
+                        local playerFromModel = Players:GetPlayerFromCharacter(parent)
+                        if playerFromModel and isPlayerValid(playerFromModel) then
+                            hitboxCache[descendant] = {
+                                instance = descendant,
+                                owner = playerFromModel,
+                                position = descendant.Position
+                            }
+                        end
+                    end
+                end
+            end)
+            
+            workspace.DescendantRemoving:Connect(function(descendant)
+                if hitboxCache[descendant] then
+                    hitboxCache[descendant] = nil
+                end
+            end)
+        end
+
+        local function isInAura(position, centerPosition)
+            local delta = position - centerPosition
+            return delta.X * delta.X + delta.Y * delta.Y + delta.Z * delta.Z <= AURA_RADIUS_SQUARED
+        end
+
+        local function applyRepelForce(targetPlayer)
+            if not humanoidRootPart or not isPlayerValid(targetPlayer) or not targetPlayer.Character then return end
+            
+            local targetCharacter = targetPlayer.Character
+            local targetRoot = targetCharacter:FindFirstChild("HumanoidRootPart")
+            
+            if not targetRoot then return end
+            
+            local direction = (humanoidRootPart.Position - targetRoot.Position).Unit
+            local repelVelocity = direction * REPEL_FORCE
+            
+            pcall(function()
+                humanoidRootPart.Velocity = humanoidRootPart.Velocity + repelVelocity
+            end)
+            
+            currentRepelTarget = targetPlayer
+            repelEndTime = os.clock() + REPEL_DURATION
+        end
+
+        local function checkCollisions()
+            if not humanoidRootPart then return false, nil end
+            
+            local currentPos = humanoidRootPart.Position
+            
+            for hitbox, data in pairs(hitboxCache) do
+                if hitbox:IsDescendantOf(workspace) then
+                    data.position = hitbox.Position
+                    
+                    if isInAura(hitbox.Position, currentPos) then
+                        local hitboxOwner = data.owner
+                        if hitboxOwner and isPlayerValid(hitboxOwner) and hitboxOwner ~= player then
+                            return true, hitboxOwner
+                        end
+                    end
+                else
+                    hitboxCache[hitbox] = nil
+                end
+            end
+            
+            return false, nil
+        end
+
+        ultraInstinctPart = createAura()
+        
+        preloadHitboxes()
+        setupHitboxListeners()
+        
+        ultraInstinctConnection = RunService.Heartbeat:Connect(function()
+            local currentTime = os.clock()
+            
+            if currentTime - lastCheckTime < CHECK_INTERVAL then
+                return
+            end
+            
+            lastCheckTime = currentTime
+            
+            if not ultraInstinctEnabled or not ultraInstinctPart or not humanoidRootPart or not isPlayerValid(player) then return end
+            
+            pcall(function()
+                ultraInstinctPart.Position = humanoidRootPart.Position
+            end)
+            
+            if currentRepelTarget and os.clock() >= repelEndTime then
+                currentRepelTarget = nil
+            end
+            
+            if not debounce then
+                local hasCollision, hitboxOwner = checkCollisions()
+                
+                if hasCollision and hitboxOwner then
+                    if hitboxOwner ~= currentRepelTarget then
+                        debounce = true
+                        applyRepelForce(hitboxOwner)
+                        
+                        task.delay(0.05, function()
+                            debounce = false
+                        end)
+                    end
+                else
+                    currentRepelTarget = nil
+                end
+            end
+        end)
+
+        player.CharacterAdded:Connect(function(newCharacter)
+            if not isCharacterValid(newCharacter) then return end
+            
+            character = newCharacter
+            humanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+            
+            if ultraInstinctEnabled then
+                toggleUltraInstinct(false)
+                task.wait(0.5)
+                toggleUltraInstinct(true)
+            end
+        end)
+
+        Fluent:Notify({
+            Title = "Ультра инстинкт активирован",
+            Content = "Автоматическое уклонение от хитбоксов включено",
+            Duration = 2
+        })
+    else
+        Fluent:Notify({
+            Title = "Ультра инстинкт деактивирован",
+            Content = "Функция ультра инстинкта отключена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleRope(value)
+    ropeEnabled = value
+    
+    if value then
+        local Players = game:GetService("Players")
+        local UserInputService = game:GetService("UserInputService")
+        local RunService = game:GetService("RunService")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+        local player = Players.LocalPlayer
+        local mouse = player:GetMouse()
+        local character = player.Character or player.CharacterAdded:Wait()
+
+        local rope = nil
+        local att0 = nil
+        local att1 = nil
+        local newRope = nil
+        local ropeActive = false
+        local toolEquipped = false
+        local lastRopeTime = 0
+
+        local rope2 = nil
+        local att0_2 = nil
+        local att1_2 = nil
+        local newRope2 = nil
+        local rope2Active = false
+        local lastRope2Time = 0
+
+        local MAX_ROPE_DISTANCE = 500
+
+        local drawRopeEvent = ReplicatedStorage:FindFirstChild("DrawRope") 
+        if not drawRopeEvent then
+            drawRopeEvent = Instance.new("RemoteEvent")
+            drawRopeEvent.Name = "DrawRope"
+            drawRopeEvent.Parent = ReplicatedStorage
+        end
+
+        local function createTool()
+            local tool = Instance.new("Tool")
+            tool.Name = "Верёвка"
+            tool.RequiresHandle = false
+            tool.CanBeDropped = false
+            tool.ManualActivationOnly = false
+            tool.Parent = player.Backpack
+            return tool
+        end
+
+        local tool = createTool()
+
+        local function checkRopeDistance()
+            if ropeActive and rope and rope.Enabled then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart and att0 then
+                    local worldPosition
+                    if att0.Parent:IsA("Part") then
+                        worldPosition = att0.Parent.CFrame:PointToWorldSpace(att0.Position)
+                    else
+                        worldPosition = att0.Parent.CFrame:PointToWorldSpace(att0.Position)
+                    end
+                    
+                    local distance = (humanoidRootPart.Position - worldPosition).Magnitude
+                    if distance > MAX_ROPE_DISTANCE then
+                        drawRopeEvent:FireServer("RemoveRope")
+                        rope.Enabled = false
+                    end
+                end
+            end
+            
+            if rope2Active and rope2 and rope2.Enabled then
+                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+                if humanoidRootPart and att0_2 then
+                    local worldPosition
+                    if att0_2.Parent:IsA("Part") then
+                        worldPosition = att0_2.Parent.CFrame:PointToWorldSpace(att0_2.Position)
+                    else
+                        worldPosition = att0_2.Parent.CFrame:PointToWorldSpace(att0_2.Position)
+                    end
+                    
+                    local distance = (humanoidRootPart.Position - worldPosition).Magnitude
+                    if distance > MAX_ROPE_DISTANCE then
+                        removeRope2()
+                    end
+                end
+            end
+        end
+
+        local function removeRope()
+            if ropeActive then
+                drawRopeEvent:FireServer("RemoveRope")
+                
+                if rope then 
+                    rope.Enabled = false
+                    rope:Destroy() 
+                end
+                if att0 then att0:Destroy() end
+                if att1 then att1:Destroy() end
+                if newRope then newRope:Destroy() end
+                ropeActive = false
+            end
+        end
+
+        local function removeRope2()
+            if rope2Active then
+                if rope2 then 
+                    rope2.Enabled = false
+                    rope2:Destroy() 
+                end
+                if att0_2 then att0_2:Destroy() end
+                if att1_2 then att1_2:Destroy() end
+                if newRope2 then newRope2:Destroy() end
+                rope2Active = false
+            end
+        end
+
+        local function createRope()
+            if not toolEquipped then return end
+            if not mouse.Target then return end
+            
+            local currentTime = tick()
+            if currentTime - lastRopeTime < 0.1 then return end
+            lastRopeTime = currentTime
+            
+            local target = mouse.Target
+            local hitPosition = mouse.Hit.Position
+            
+            if ropeActive then
+                removeRope()
+                return
+            end
+            
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then return end
+
+            local distance = (humanoidRootPart.Position - hitPosition).Magnitude
+            if distance > MAX_ROPE_DISTANCE then 
+                return 
+            end
+            
+            if distance < 5 then
+                distance = 5
+            end
+
+            if target:IsA('Sky') or target:IsA('Atmosphere') then
+                return
+            end
+
+            drawRopeEvent:FireServer("CreateRope", hitPosition, distance)
+
+            rope = Instance.new('RopeConstraint')
+            att0 = Instance.new('Attachment')
+            att1 = Instance.new('Attachment')
+
+            if target.Name ~= 'Baseplate' and target.Anchored then
+                local objectCFrame = target.CFrame
+                local localPosition = objectCFrame:PointToObjectSpace(hitPosition)
+                att0.Position = localPosition
+                att0.Parent = target
+            else
+                newRope = Instance.new("Part")
+                newRope.Name = "RopeAnchor"
+                newRope.Size = Vector3.new(0.1, 0.1, 0.1)
+                newRope.Anchored = true
+                newRope.CanCollide = false
+                newRope.Transparency = 1
+                newRope.Parent = workspace
+                newRope.Position = hitPosition
+                att0.Parent = newRope
+            end
+
+            att1.Parent = humanoidRootPart
+
+            rope.Visible = true
+            rope.Parent = humanoidRootPart
+            rope.Attachment0 = att0
+            rope.Attachment1 = att1
+            rope.Length = distance
+            rope.Enabled = true
+            ropeActive = true
+        end
+
+        local function createRope2()
+            if not mouse.Target then return end
+            
+            local currentTime = tick()
+            if currentTime - lastRope2Time < 0.1 then return end
+            lastRope2Time = currentTime
+            
+            local target = mouse.Target
+            local hitPosition = mouse.Hit.Position
+            
+            if rope2Active then
+                removeRope2()
+                return
+            end
+            
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then return end
+
+            local distance = (humanoidRootPart.Position - hitPosition).Magnitude
+            if distance > MAX_ROPE_DISTANCE then 
+                return 
+            end
+            
+            if distance < 5 then
+                distance = 5
+            end
+
+            if target:IsA('Sky') or target:IsA('Atmosphere') then
+                return
+            end
+
+            rope2 = Instance.new('RopeConstraint')
+            att0_2 = Instance.new('Attachment')
+            att1_2 = Instance.new('Attachment')
+
+            if target.Name ~= 'Baseplate' and target.Anchored then
+                local objectCFrame = target.CFrame
+                local localPosition = objectCFrame:PointToObjectSpace(hitPosition)
+                att0_2.Position = localPosition
+                att0_2.Parent = target
+            else
+                newRope2 = Instance.new("Part")
+                newRope2.Name = "RopeAnchor2"
+                newRope2.Size = Vector3.new(0.1, 0.1, 0.1)
+                newRope2.Anchored = true
+                newRope2.CanCollide = false
+                newRope2.Transparency = 1
+                newRope2.Parent = workspace
+                newRope2.Position = hitPosition
+                att0_2.Parent = newRope2
+            end
+
+            att1_2.Parent = humanoidRootPart
+
+            rope2.Visible = true
+            rope2.Parent = humanoidRootPart
+            rope2.Attachment0 = att0_2
+            rope2.Attachment1 = att1_2
+            rope2.Length = distance
+            rope2.Enabled = true
+            rope2Active = true
+            
+            rope2.Thickness = 0.1
+            rope2.Color = Color3.new(0.8, 0.8, 0.8)
+        end
+
+        if keybindsEnabled then
+            setupKeybind("Rope", createRope2)
+        end
+
+        RunService.Heartbeat:Connect(checkRopeDistance)
+
+        tool.Equipped:Connect(function()
+            toolEquipped = true
+        end)
+
+        tool.Unequipped:Connect(function()
+            toolEquipped = false
+            wait(0.1)
+            removeRope()
+        end)
+
+        tool.Activated:Connect(function()
+            createRope()
+        end)
+
+        player.CharacterAdded:Connect(function(newCharacter)
+            character = newCharacter
+            toolEquipped = false
+            
+            removeRope()
+            removeRope2()
+            
+            wait(0.1)
+            
+            if not player.Backpack:FindFirstChild("Верёвка") then
+                tool = createTool()
+                
+                tool.Equipped:Connect(function()
+                    toolEquipped = true
+                end)
+
+                tool.Unequipped:Connect(function()
+                    toolEquipped = false
+                    wait(0.1)
+                    removeRope()
+                end)
+
+                tool.Activated:Connect(function()
+                    createRope()
+                end)
+            end
+            
+            local humanoid = newCharacter:WaitForChild("Humanoid")
+            humanoid.Died:Connect(function()
+                toolEquipped = false
+                removeRope()
+                removeRope2()
+            end)
+        end)
+
+        if character then
+            local humanoid = character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.Died:Connect(function()
+                    toolEquipped = false
+                    removeRope()
+                    removeRope2()
+                end)
+            end
+        end
+
+        Fluent:Notify({
+            Title = "Верёвка активирована",
+            Content = "Инструмент добавлен в инвентарь",
+            Duration = 3
+        })
+    else
+        Fluent:Notify({
+            Title = "Верёвка деактивирована",
+            Content = "Функция веревки отключена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleAutoCraft(value)
+    autoCraftEnabled = value
+    
+    if autoCraftConnection then
+        autoCraftConnection:Disconnect()
+        autoCraftConnection = nil
+    end
+    
+    if value then
+        local UserInputService = game:GetService("UserInputService")
+        local RunService = game:GetService("RunService")
+        
+        local function findCTInteract()
+            local ctInteract = workspace:FindFirstChild("CTInteract")
+            if not ctInteract then
+                return nil
+            end
+            
+            local proximityPrompt = ctInteract:FindFirstChild("ProximityPrompt")
+            if not proximityPrompt or not proximityPrompt:IsA("ProximityPrompt") then
+                return nil
+            end
+            
+            return {
+                Part = ctInteract,
+                Prompt = proximityPrompt
+            }
+        end
+        
+        local function activateProximityPrompt(prompt)
+            if prompt and prompt:IsA("ProximityPrompt") then
+                prompt:InputHoldBegin()
+                prompt:InputHoldEnd()
+            end
+        end
+        
+        local function performCTInteractTeleport()
+            local player = game.Players.LocalPlayer
+            if not isPlayerValid(player) then return end
+            
+            local character = player.Character
+            if not character then return end
+            
+            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then return end
+            
+            local ctInteract = findCTInteract()
+            if not ctInteract then 
+                Fluent:Notify({
+                    Title = "Ошибка",
+                    Content = "CTInteract не найден!",
+                    Duration = 2
+                })
+                return 
+            end
+            
+            local returnPosition = humanoidRootPart.Position
+            
+            humanoidRootPart.CFrame = CFrame.new(ctInteract.Part.Position + Vector3.new(0, 3, 0))
+            
+            wait(0.05)
+            
+            activateProximityPrompt(ctInteract.Prompt)
+            
+            wait(0.05)
+            
+            humanoidRootPart.CFrame = CFrame.new(returnPosition)
+            
+            Fluent:Notify({
+                Title = "Автокрафт",
+                Content = "Телепорт к крафту выполнен",
+                Duration = 2
+            })
+        end
+        
+        if keybindsEnabled then
+            setupKeybind("AutoCraft", performCTInteractTeleport)
+        end
+        
+        Fluent:Notify({
+            Title = "Автокрафт активирован",
+            Content = "Нажмите клавишу P для телепорта к крафту",
+            Duration = 3
+        })
+        
+    else
+        Fluent:Notify({
+            Title = "Автокрафт деактивирован",
+            Content = "Функция автокрафта отключена",
+            Duration = 2
+        })
+    end
+end
+
+local function togglePlayerTeleport(value)
+    playerTeleportEnabled = value
+    
+    if playerTeleportGUI then
+        pcall(function() playerTeleportGUI:Destroy() end)
+        playerTeleportGUI = nil
+    end
+    
+    if value then
+        local Players = game:GetService("Players")
+        local TweenService = game:GetService("TweenService")
+        local UserInputService = game:GetService("UserInputService")
+        local RunService = game:GetService("RunService")
+
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "PlayerTeleportGUI"
+        ScreenGui.Parent = game.CoreGui
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+        local MainFrame = Instance.new("Frame")
+        MainFrame.Size = UDim2.new(0, 300, 0, 400)
+        MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+        MainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+        MainFrame.BorderSizePixel = 0
+        MainFrame.ClipsDescendants = true
+        MainFrame.Active = true
+        MainFrame.Selectable = true
+        MainFrame.Parent = ScreenGui
+
+        local UICorner = Instance.new("UICorner")
+        UICorner.CornerRadius = UDim.new(0, 8)
+        UICorner.Parent = MainFrame
+
+        local UIStroke = Instance.new("UIStroke")
+        UIStroke.Color = Color3.fromRGB(80, 80, 80)
+        UIStroke.Thickness = 2
+        UIStroke.Parent = MainFrame
+
+        local Title = Instance.new("TextLabel")
+        Title.Size = UDim2.new(1, -40, 0, 40)
+        Title.Position = UDim2.new(0, 0, 0, 0)
+        Title.BackgroundTransparency = 1
+        Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Title.Text = "Телепорт к игрокам"
+        Title.Font = Enum.Font.GothamBold
+        Title.TextSize = 16
+        Title.TextXAlignment = Enum.TextXAlignment.Left
+        Title.Parent = MainFrame
+
+        local CloseButton = Instance.new("TextButton")
+        CloseButton.Size = UDim2.new(0, 30, 0, 30)
+        CloseButton.Position = UDim2.new(1, -35, 0, 5)
+        CloseButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+        CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+        CloseButton.Text = "X"
+        CloseButton.Font = Enum.Font.GothamBold
+        CloseButton.TextSize = 14
+        CloseButton.Parent = MainFrame
+
+        local UICorner2 = Instance.new("UICorner")
+        UICorner2.CornerRadius = UDim.new(0, 6)
+        UICorner2.Parent = CloseButton
+
+        local SearchFrame = Instance.new("Frame")
+        SearchFrame.Size = UDim2.new(1, -20, 0, 40)
+        SearchFrame.Position = UDim2.new(0, 10, 0, 45)
+        SearchFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        SearchFrame.BorderSizePixel = 0
+        SearchFrame.Parent = MainFrame
+
+        local UICorner3 = Instance.new("UICorner")
+        UICorner3.CornerRadius = UDim.new(0, 6)
+        UICorner3.Parent = SearchFrame
+
+        local SearchBox = Instance.new("TextBox")
+        SearchBox.Size = UDim2.new(1, -40, 1, 0)
+        SearchBox.Position = UDim2.new(0, 10, 0, 0)
+        SearchBox.BackgroundTransparency = 1
+        SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+        SearchBox.PlaceholderText = "Поиск по нику..."
+        SearchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+        SearchBox.Text = ""
+        SearchBox.Font = Enum.Font.Gotham
+        SearchBox.TextSize = 14
+        SearchBox.TextXAlignment = Enum.TextXAlignment.Left
+        SearchBox.Parent = SearchFrame
+
+        local SearchIcon = Instance.new("TextLabel")
+        SearchIcon.Size = UDim2.new(0, 20, 0, 20)
+        SearchIcon.Position = UDim2.new(1, -25, 0.5, -10)
+        SearchIcon.BackgroundTransparency = 1
+        SearchIcon.TextColor3 = Color3.fromRGB(200, 200, 200)
+        SearchIcon.Text = "🔍"
+        SearchIcon.Font = Enum.Font.Gotham
+        SearchIcon.TextSize = 14
+        SearchIcon.Parent = SearchFrame
+
+        local ScrollingFrame = Instance.new("ScrollingFrame")
+        ScrollingFrame.Size = UDim2.new(1, -20, 1, -130)
+        ScrollingFrame.Position = UDim2.new(0, 10, 0, 95)
+        ScrollingFrame.BackgroundTransparency = 1
+        ScrollingFrame.ScrollBarThickness = 6
+        ScrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+        ScrollingFrame.CanCanvasSize = UDim2.new(0, 0, 0, 0)
+        ScrollingFrame.Parent = MainFrame
+
+        local UIListLayout = Instance.new("UIListLayout")
+        UIListLayout.Padding = UDim.new(0, 8)
+        UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        UIListLayout.Parent = ScrollingFrame
+
+        local CreditLabel = Instance.new("TextLabel")
+        CreditLabel.Size = UDim2.new(1, -20, 0, 20)
+        CreditLabel.Position = UDim2.new(0, 10, 1, -30)
+        CreditLabel.BackgroundTransparency = 1
+        CreditLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+        CreditLabel.Text = "by Sharik"
+        CreditLabel.Font = Enum.Font.Gotham
+        CreditLabel.TextSize = 12
+        CreditLabel.TextXAlignment = Enum.TextXAlignment.Right
+        CreditLabel.Parent = MainFrame
+
+        local isVisible = true
+        local isDragging = false
+        local dragStart
+        local startPos
+
+        local function startDrag(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                isDragging = true
+                dragStart = input.Position
+                startPos = MainFrame.Position
+                
+                local dragConnection
+                local endConnection
+                
+                dragConnection = UserInputService.InputChanged:Connect(function(input)
+                    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                        local delta = input.Position - dragStart
+                        MainFrame.Position = UDim2.new(
+                            startPos.X.Scale, 
+                            startPos.X.Offset + delta.X,
+                            startPos.Y.Scale, 
+                            startPos.Y.Offset + delta.Y
+                        )
+                    end
+                end)
+                
+                endConnection = UserInputService.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        isDragging = false
+                        dragConnection:Disconnect()
+                        endConnection:Disconnect()
+                    end
+                end)
+            end
+        end
+
+        Title.InputBegan:Connect(startDrag)
+
+        local function teleportToPlayer(player)
+            if player == game.Players.LocalPlayer then
+                Fluent:Notify({
+                    Title = "Ошибка",
+                    Content = "Нельзя телепортироваться к себе",
+                    Duration = 2
+                })
+                return
+            end
+            
+            local localPlayer = game.Players.LocalPlayer
+            local localCharacter = localPlayer.Character
+            
+            if not localCharacter then
+                Fluent:Notify({
+                    Title = "Ошибка",
+                    Content = "Персонаж не найден",
+                    Duration = 2
+                })
+                return
+            end
+            
+            local targetCharacter = player.Character
+            if not targetCharacter then
+                Fluent:Notify({
+                    Title = "Ошибка",
+                    Content = "Персонаж игрока не найден",
+                    Duration = 2
+                })
+                return
+            end
+            
+            local humanoidRootPart = localCharacter:FindFirstChild("HumanoidRootPart")
+            local targetHead = targetCharacter:FindFirstChild("Head")
+            
+            if not humanoidRootPart or not targetHead then
+                Fluent:Notify({
+                    Title = "Ошибка",
+                    Content = "Не удалось найти необходимые части тела",
+                    Duration = 2
+                })
+                return
+            end
+            
+            humanoidRootPart.CFrame = targetHead.CFrame + Vector3.new(0, 3, 0)
+            
+            Fluent:Notify({
+                Title = "Телепортация",
+                Content = "Телепортирован к " .. player.Name,
+                Duration = 2
+            })
+        end
+
+        local function updateCanvasSize()
+            local contentSize = UIListLayout.AbsoluteContentSize
+            ScrollingFrame.CanCanvasSize = UDim2.new(0, 0, 0, contentSize.Y + 10)
+        end
+
+        local function toggleUI()
+            isVisible = not isVisible
+            MainFrame.Visible = isVisible
+        end
+
+        CloseButton.MouseButton1Click:Connect(toggleUI)
+
+        local function createPlayerButton(player)
+            local button = Instance.new("Frame")
+            button.Size = UDim2.new(1, 0, 0, 50)
+            button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+            button.BorderSizePixel = 0
+            button.LayoutOrder = player.UserId
+            
+            local UICorner = Instance.new("UICorner")
+            UICorner.CornerRadius = UDim.new(0, 6)
+            UICorner.Parent = button
+            
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, -60, 1, 0)
+            nameLabel.Position = UDim2.new(0, 10, 0, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            nameLabel.Text = player.Name
+            nameLabel.Font = Enum.Font.Gotham
+            nameLabel.TextSize = 14
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            nameLabel.Parent = button
+            
+            local teleportButton = Instance.new("TextButton")
+            teleportButton.Size = UDim2.new(0, 40, 0, 30)
+            teleportButton.Position = UDim2.new(1, -50, 0.5, -15)
+            teleportButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+            teleportButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            teleportButton.Text = "TP"
+            teleportButton.Font = Enum.Font.GothamBold
+            teleportButton.TextSize = 12
+            teleportButton.Parent = button
+            
+            local UICorner2 = Instance.new("UICorner")
+            UICorner2.CornerRadius = UDim.new(0, 4)
+            UICorner2.Parent = teleportButton
+            
+            teleportButton.MouseButton1Click:Connect(function()
+                teleportToPlayer(player)
+            end)
+            
+            return button
+        end
+
+        local function filterPlayers(searchText)
+            searchText = searchText:lower()
+            
+            for _, child in ipairs(ScrollingFrame:GetChildren()) do
+                if child:IsA("Frame") then
+                    child.Visible = true
+                    if searchText ~= "" and not child:FindFirstChildOfClass("TextLabel").Text:lower():find(searchText, 1, true) then
+                        child.Visible = false
+                    end
+                end
+            end
+            
+            updateCanvasSize()
+        end
+
+        SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+            filterPlayers(SearchBox.Text)
+        end)
+
+        local function updatePlayerList()
+            for _, child in ipairs(ScrollingFrame:GetChildren()) do
+                if child:IsA("Frame") then
+                    child:Destroy()
+                end
+            end
+            
+            local players = Players:GetPlayers()
+            table.sort(players, function(a, b) return a.Name:lower() < b.Name:lower() end)
+            
+            for _, player in ipairs(players) do
+                if player ~= game.Players.LocalPlayer then
+                    local button = createPlayerButton(player)
+                    button.Parent = ScrollingFrame
+                end
+            end
+            
+            filterPlayers(SearchBox.Text)
+        end
+
+        local function onPlayerAdded(player)
+            if player ~= game.Players.LocalPlayer then
+                task.wait(0.5)
+                updatePlayerList()
+            end
+        end
+
+        local function onPlayerRemoving(player)
+            updatePlayerList()
+        end
+
+        Players.PlayerAdded:Connect(onPlayerAdded)
+        Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+        UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvasSize)
+
+        task.wait(1)
+        updatePlayerList()
+
+        if keybindsEnabled then
+            setupKeybind("PlayerTeleportGUI", toggleUI)
+        end
+
+        playerTeleportGUI = ScreenGui
+        
+        local function cleanup()
+            Players.PlayerAdded:Disconnect(onPlayerAdded)
+            Players.PlayerRemoving:Disconnect(onPlayerRemoving)
+        end
+        
+        Fluent:Notify({
+            Title = "Телепорт к игрокам активирован",
+            Content = "Нажмите F5 для открытия/закрытия интерфейса",
+            Duration = 3
+        })
+    else
+        Fluent:Notify({
+            Title = "Телепорт к игрокам деактивирован",
+            Content = "Функция телепорта к игрокам отключена",
+            Duration = 2
+        })
+    end
+end
+
+local function toggleSit(value)
+    sitEnabled = value
+    
+    if sitConnection then
+        sitConnection:Disconnect()
+        sitConnection = nil
+    end
+    
+    if value then
+        local UserInputService = game:GetService("UserInputService")
+        
+        if keybindsEnabled then
+            setupKeybind("Sit", function()
+                local player = game.Players.LocalPlayer
+                if isPlayerValid(player) and player.Character then
+                    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                    if humanoid then
+                        if humanoid.Sit then
+                            humanoid.Sit = false
+                        else
+                            humanoid.Sit = true
+                        end
+                    end
+                end
+            end)
+        end
+        
+        Fluent:Notify({
+            Title = "Sit активирован",
+            Content = "Нажмите " .. sitKeybind .. " для сидения/вставания",
+            Duration = 3
+        })
+    else
+        Fluent:Notify({
+            Title = "Sit деактивирован",
+            Content = "Функция сидения отключена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleLoopWS(value)
+    loopWSEnabled = value
+    
+    if loopWSConnection then
+        loopWSConnection:Disconnect()
+        loopWSConnection = nil
+    end
+    
+    if value then
+        local player = game.Players.LocalPlayer
+        if not isPlayerValid(player) then return end
+        
+        local function enforceWalkSpeed()
+            if not loopWSEnabled or not isPlayerValid(player) then return end
+            
+            local character = player.Character
+            if not character then return end
+            
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not humanoid then return end
+            
+            if humanoid.WalkSpeed ~= 16 then
+                humanoid.WalkSpeed = 16
+            end
+        end
+        
+        loopWSConnection = game:GetService("RunService").Heartbeat:Connect(function()
+            pcall(enforceWalkSpeed)
+        end)
+        
+        player.CharacterAdded:Connect(function(newCharacter)
+            if not loopWSEnabled then return end
+            
+            task.wait(1)
+            if isCharacterValid(newCharacter) then
+                local humanoid = newCharacter:WaitForChild("Humanoid", 3)
+                if humanoid then
+                    humanoid.WalkSpeed = 16
+                end
+            end
+        end)
+        
+        Fluent:Notify({
+            Title = "LoopWS 16 активирован",
+            Content = "Скорость передвижения установлена на 16",
+            Duration = 3
+        })
+    else
+        local player = game.Players.LocalPlayer
+        if isPlayerValid(player) and player.Character then
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+            end
+        end
+        
+        Fluent:Notify({
+            Title = "LoopWS 16 деактивирован",
+            Content = "Принудительная установка скорости отключена",
+            Duration = 2
+        })
+    end
+end
+
+local function toggleHover(value)
+    hoverEnabled = value
+    
+    if hoverConnection then
+        hoverConnection:Disconnect()
+        hoverConnection = nil
+    end
+    
+    if hoverUI then
+        pcall(function() hoverUI:Destroy() end)
+        hoverUI = nil
+    end
+    
+    if value then
+        local Players = game:GetService("Players")
+        local TweenService = game:GetService("TweenService")
+        local UserInputService = game:GetService("UserInputService")
+        local RunService = game:GetService("RunService")
+
+        local localPlayer = Players.LocalPlayer
+
+        local function createUI()
+            local oldUI = game.CoreGui:FindFirstChild("HoverUI")
+            if oldUI then
+                oldUI:Destroy()
+            end
+
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.Name = "HoverUI"
+            screenGui.ResetOnSpawn = false
+            screenGui.Parent = game.CoreGui
+
+            local mainFrame = Instance.new("Frame")
+            mainFrame.Size = UDim2.new(0, 250, 0, 330)
+            mainFrame.Position = UDim2.new(0.5, -125, 0.5, -165)
+            mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+            mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            mainFrame.BorderSizePixel = 0
+            mainFrame.ClipsDescendants = true
+            mainFrame.Parent = screenGui
+
+            local title = Instance.new("TextLabel")
+            title.Size = UDim2.new(1, 0, 0, 30)
+            title.Position = UDim2.new(0, 0, 0, 0)
+            title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+            title.TextColor3 = Color3.fromRGB(255, 255, 255)
+            title.Text = "Зависание над человеком"
+            title.Font = Enum.Font.GothamBold
+            title.TextSize = 14
+            title.Parent = mainFrame
+
+            local closeButton = Instance.new("TextButton")
+            closeButton.Size = UDim2.new(0, 20, 0, 20)
+            closeButton.Position = UDim2.new(1, -25, 0, 5)
+            closeButton.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+            closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            closeButton.Text = "X"
+            closeButton.Font = Enum.Font.GothamBold
+            closeButton.TextSize = 12
+            closeButton.Parent = mainFrame
+
+            local searchFrame = Instance.new("Frame")
+            searchFrame.Size = UDim2.new(1, -10, 0, 30)
+            searchFrame.Position = UDim2.new(0, 5, 0, 35)
+            searchFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            searchFrame.BorderSizePixel = 0
+            searchFrame.Parent = mainFrame
+
+            local searchBox = Instance.new("TextBox")
+            searchBox.Size = UDim2.new(1, -25, 1, 0)
+            searchBox.Position = UDim2.new(0, 5, 0, 0)
+            searchBox.BackgroundTransparency = 1
+            searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+            searchBox.PlaceholderText = "Поиск по нику..."
+            searchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+            searchBox.Text = ""
+            searchBox.Font = Enum.Font.Gotham
+            searchBox.TextSize = 12
+            searchBox.TextXAlignment = Enum.TextXAlignment.Left
+            searchBox.Parent = searchFrame
+
+            local searchIcon = Instance.new("TextLabel")
+            searchIcon.Size = UDim2.new(0, 20, 1, 0)
+            searchIcon.Position = UDim2.new(1, -20, 0, 0)
+            searchIcon.BackgroundTransparency = 1
+            searchIcon.TextColor3 = Color3.fromRGB(200, 200, 200)
+            searchIcon.Text = "🔍"
+            searchIcon.Font = Enum.Font.Gotham
+            searchIcon.TextSize = 12
+            searchIcon.Parent = searchFrame
+
+            local scrollFrame = Instance.new("ScrollingFrame")
+            scrollFrame.Size = UDim2.new(1, -10, 0, 180)
+            scrollFrame.Position = UDim2.new(0, 5, 0, 70)
+            scrollFrame.BackgroundTransparency = 1
+            scrollFrame.ScrollBarThickness = 5
+            scrollFrame.CanCanvasSize = UDim2.new(0, 0, 0, 0)
+            scrollFrame.Parent = mainFrame
+
+            local listLayout = Instance.new("UIListLayout")
+            listLayout.Padding = UDim.new(0, 5)
+            listLayout.Parent = scrollFrame
+
+            local buttonFrame = Instance.new("Frame")
+            buttonFrame.Size = UDim2.new(1, -10, 0, 40)
+            buttonFrame.Position = UDim2.new(0, 5, 0, 255)
+            buttonFrame.BackgroundTransparency = 1
+            buttonFrame.Parent = mainFrame
+
+            local startButton = Instance.new("TextButton")
+            startButton.Size = UDim2.new(0, 100, 0, 30)
+            startButton.Position = UDim2.new(0, 0, 0, 5)
+            startButton.BackgroundColor3 = Color3.fromRGB(60, 180, 80)
+            startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            startButton.Text = "Начать"
+            startButton.Font = Enum.Font.GothamBold
+            startButton.TextSize = 12
+            startButton.Parent = buttonFrame
+
+            local stopButton = Instance.new("TextButton")
+            stopButton.Size = UDim2.new(0, 100, 0, 30)
+            stopButton.Position = UDim2.new(1, -100, 0, 5)
+            stopButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+            stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+            stopButton.Text = "Остановить"
+            stopButton.Font = Enum.Font.GothamBold
+            stopButton.TextSize = 12
+            stopButton.Parent = buttonFrame
+
+            local creditLabel = Instance.new("TextLabel")
+            creditLabel.Size = UDim2.new(1, -10, 0, 20)
+            creditLabel.Position = UDim2.new(0, 5, 1, -25)
+            creditLabel.BackgroundTransparency = 1
+            creditLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            creditLabel.Text = "by Sharik"
+            creditLabel.Font = Enum.Font.Gotham
+            creditLabel.TextSize = 12
+            creditLabel.Parent = mainFrame
+
+            return screenGui, mainFrame, title, closeButton, searchBox, scrollFrame, startButton, stopButton
+        end
+
+        hoverUI, mainFrame, title, closeButton, searchBox, scrollFrame, startButton, stopButton = createUI()
+
+        hoverTargetPlayer = nil
+        hoverIsFollowing = false
+        local playerButtons = {}
+        local isDragging = false
+        local dragStart, frameStart
+
+        local function followPlayer()
+            if not hoverIsFollowing or not hoverTargetPlayer or not hoverTargetPlayer.Character then
+                return
+            end
+            
+            local humanoidRootPart = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local targetRoot = hoverTargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            
+            if not humanoidRootPart or not targetRoot then
+                return
+            end
+            
+            local offset = Vector3.new(0, 3, 0)
+            humanoidRootPart.CFrame = CFrame.new(targetRoot.Position + offset)
+        end
+
+        local function startDrag(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                isDragging = true
+                dragStart = input.Position
+                frameStart = mainFrame.Position
+                
+                local connection
+                connection = input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        isDragging = false
+                        connection:Disconnect()
+                    end
+                end)
+            end
+        end
+
+        local function updateDrag(input)
+            if isDragging then
+                local delta = input.Position - dragStart
+                mainFrame.Position = UDim2.new(
+                    frameStart.X.Scale, 
+                    frameStart.X.Offset + delta.X, 
+                    frameStart.Y.Scale, 
+                    frameStart.Y.Offset + delta.Y
+                )
+            end
+        end
+
+        title.InputBegan:Connect(startDrag)
+        title.InputChanged:Connect(updateDrag)
+
+        local function updatePlayerList(searchText)
+            for _, button in pairs(playerButtons) do
+                button:Destroy()
+            end
+            playerButtons = {}
+            
+            local allPlayers = Players:GetPlayers()
+            local filteredPlayers = {}
+            
+            for _, player in pairs(allPlayers) do
+                if player ~= localPlayer then
+                    local playerName = player.Name:lower()
+                    local searchLower = searchText and searchText:lower() or ""
+                    
+                    if searchText == "" or playerName:find(searchLower) then
+                        table.insert(filteredPlayers, player)
+                    end
+                end
+            end
+            
+            for _, player in pairs(filteredPlayers) do
+                local button = Instance.new("TextButton")
+                button.Size = UDim2.new(1, 0, 0, 30)
+                button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+                button.TextColor3 = Color3.fromRGB(255, 255, 255)
+                button.Text = player.Name
+                button.Font = Enum.Font.Gotham
+                button.TextSize = 12
+                button.AutoButtonColor = true
+                button.Parent = scrollFrame
+                
+                button.MouseButton1Click:Connect(function()
+                    hoverTargetPlayer = player
+                end)
+                
+                table.insert(playerButtons, button)
+            end
+            
+            scrollFrame.CanCanvasSize = UDim2.new(0, 0, 0, #playerButtons * 35)
+        end
+
+        local function toggleUI()
+            mainFrame.Visible = not mainFrame.Visible
+        end
+
+        searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+            updatePlayerList(searchBox.Text)
+        end)
+
+        startButton.MouseButton1Click:Connect(function()
+            if not hoverTargetPlayer then
+                return
+            end
+            
+            hoverIsFollowing = true
+            
+            if hoverConnection then
+                hoverConnection:Disconnect()
+            end
+            
+            hoverConnection = RunService.Heartbeat:Connect(function()
+                if hoverIsFollowing and hoverTargetPlayer and hoverTargetPlayer.Character then
+                    followPlayer()
+                end
+            end)
+        end)
+
+        stopButton.MouseButton1Click:Connect(function()
+            hoverIsFollowing = false
+            hoverTargetPlayer = nil
+            
+            if hoverConnection then
+                hoverConnection:Disconnect()
+                hoverConnection = nil
+            end
+        end)
+
+        closeButton.MouseButton1Click:Connect(toggleUI)
+
+        if keybindsEnabled then
+            setupKeybind("PlayerTeleportGUI", toggleUI)
+        end
+
+        Players.PlayerAdded:Connect(function(player)
+            updatePlayerList(searchBox.Text)
+        end)
+
+        Players.PlayerRemoving:Connect(function()
+            updatePlayerList(searchBox.Text)
+        end)
+
+        updatePlayerList("")
+        
+        Fluent:Notify({
+            Title = "Зависание над человеком активировано",
+            Content = "Нажмите F5 для открытия/закрытия интерфейса",
+            Duration = 3
+        })
+    else
+        hoverIsFollowing = false
+        hoverTargetPlayer = nil
+        
+        if hoverConnection then
+            hoverConnection:Disconnect()
+            hoverConnection = nil
+        end
+        
+        Fluent:Notify({
+            Title = "Зависание над человеком деактивировано",
+            Content = "Функция зависания отключена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function createInvisiblePlatform(position, width, height, depth)
+    local part = Instance.new("Part")
+    part.Name = "InvisiblePlatform"
+    part.Position = position
+    part.Size = Vector3.new(width, height, depth)
+    part.Anchored = true
+    part.CanCollide = true
+    part.Transparency = 1
+    part.CastShadow = false
+    part.Material = Enum.Material.SmoothPlastic
+    part.Color = Color3.fromRGB(255, 255, 255)
+    part.Locked = true
+    part.Parent = workspace
+    
+    return part
+end
+
+local function toggleInvisiblePlatform(value)
+    invisiblePlatformEnabled = value
+    
+    if value then
+        invisiblePlatform = createInvisiblePlatform(
+            Vector3.new(174.92919921875, 2022.4998779296875, -106.78223419189453),
+            2048,
+            1,
+            2048
+        )
+        Fluent:Notify({
+            Title = "Невидимая платформа",
+            Content = "Платформа создана успешно!",
+            Duration = 3
+        })
+    else
+        if invisiblePlatform and invisiblePlatform.Parent then
+            pcall(function() invisiblePlatform:Destroy() end)
+            invisiblePlatform = nil
+        end
+        Fluent:Notify({
+            Title = "Невидимая платформа",
+            Content = "Платформа удалена",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleCoordinatesGrabber(value)
+    coordinatesGrabberEnabled = value
+    
+    if coordinatesGrabberGUI then
+        pcall(function() coordinatesGrabberGUI:Destroy() end)
+        coordinatesGrabberGUI = nil
+    end
+    
+    if value then
+        local coordgui = Instance.new("ScreenGui")
+        coordgui.Name = "coordgui"
+        coordgui.Parent = game.CoreGui
+
+        local main = Instance.new("Frame")
+        main.Name = "main"
+        main.Parent = coordgui
+        main.BackgroundColor3 = Color3.fromRGB(1, 1, 1)
+        main.Position = UDim2.new(0.352638364, 0, 0.405797124, 0)
+        main.Size = UDim2.new(0, 228, 0, 142)
+        main.Style = Enum.FrameStyle.DropShadow
+        main.Active = true
+        main.Draggable = true
+
+        local title = Instance.new("TextLabel")
+        title.Name = "title"
+        title.Parent = main
+        title.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        title.Position = UDim2.new(-0.0517418832, 0, -0.054933358, 0)
+        title.Size = UDim2.new(0, 235, 0, 19)
+        title.Font = Enum.Font.SciFi
+        title.Text = "Coordinates Grabber Gui"
+        title.TextColor3 = Color3.fromRGB(1, 1, 1)
+        title.TextSize = 14
+
+        local credit = Instance.new("TextLabel")
+        credit.Name = "credit"
+        credit.Parent = main
+        credit.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        credit.Position = UDim2.new(-0.0517418832, 0, 0.930982113, 0)
+        credit.Size = UDim2.new(0, 235, 0, 19)
+        credit.Font = Enum.Font.SciFi
+        credit.Text = "Made By CallMeChin @ V3RM"
+        credit.TextColor3 = Color3.fromRGB(1, 1, 1)
+        credit.TextSize = 14
+
+        local grab = Instance.new("TextButton")
+        grab.Name = "grab"
+        grab.Parent = main
+        grab.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        grab.Position = UDim2.new(0.0381504558, 0, 0.600263834, 0)
+        grab.Size = UDim2.new(0, 128, 0, 31)
+        grab.Font = Enum.Font.SciFi
+        grab.Text = "Grab Coordinates"
+        grab.TextColor3 = Color3.fromRGB(1, 1, 1)
+        grab.TextSize = 14
+
+        local copy = Instance.new("TextButton")
+        copy.Name = "copy"
+        copy.Parent = main
+        copy.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        copy.Position = UDim2.new(0.697107434, 0, 0.595215261, 0)
+        copy.Size = UDim2.new(0, 52, 0, 32)
+        copy.Font = Enum.Font.SciFi
+        copy.Text = "Copy"
+        copy.TextColor3 = Color3.fromRGB(1, 1, 1)
+        copy.TextSize = 14
+
+        local cords = Instance.new("TextLabel")
+        cords.Name = "cords"
+        cords.Parent = main
+        cords.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        cords.Position = UDim2.new(0.0420129336, 0, 0.199266031, 0)
+        cords.Size = UDim2.new(0, 194, 0, 37)
+        cords.Font = Enum.Font.SciFi
+        cords.Text = ""
+        cords.TextColor3 = Color3.fromRGB(1, 1, 1)
+        cords.TextSize = 14
+
+        grab.MouseButton1Down:Connect(function()
+            local player = game.Players.LocalPlayer
+            if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                cords.Text = tostring(player.Character.HumanoidRootPart.Position)
+            end
+        end)
+
+        copy.MouseButton1Down:Connect(function()
+            setclipboard(""..cords.Text)
+        end)
+
+        coordinatesGrabberGUI = coordgui
+        Fluent:Notify({
+            Title = "Coordinates Grabber",
+            Content = "GUI активирован",
+            Duration = 3
+        })
+    else
+        Fluent:Notify({
+            Title = "Coordinates Grabber",
+            Content = "GUI деактивирован",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleSuperRingParts(value)
+    superRingPartsEnabled = value
+    
+    if value then
+        local success, result = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/your-repo/super-ring-parts/main/script.lua"))()
+        end)
+        
+        if success then
+            Fluent:Notify({
+                Title = "Super Ring Parts",
+                Content = "Скрипт активирован",
+                Duration = 3
+            })
+        else
+            Fluent:Notify({
+                Title = "Ошибка",
+                Content = "Не удалось загрузить Super Ring Parts",
+                Duration = 3
+            })
+        end
+    else
+        Fluent:Notify({
+            Title = "Super Ring Parts",
+            Content = "Скрипт деактивирован",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function toggleSignDeleter(value)
+    signDeleterEnabled = value
+    
+    if value then
+        local success, result = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/your-repo/sign-deleter/main/script.lua"))()
+        end)
+        
+        if success then
+            Fluent:Notify({
+                Title = "Sign Deleter",
+                Content = "Скрипт активирован",
+                Duration = 3
+            })
+        else
+            Fluent:Notify({
+                Title = "Ошибка",
+                Content = "Не удалось загрузить Sign Deleter",
+                Duration = 3
+            })
+        end
+    else
+        Fluent:Notify({
+            Title = "Sign Deleter",
+            Content = "Скрипт деактивирован",
+            Duration = 2
+        })
+    end
+    saveSettings()
+end
+
+local function disableAllFeatures()
+    if teleportEnabled then
+        if teleportConnection then
+            teleportConnection:Disconnect()
+            teleportConnection = nil
+        end
+        positionHistory = {}
+        isTeleporting = false
+        teleportEnabled = false
+    end
+    
+    if jumpBoostEnabled then
+        if qConnection then qConnection:Disconnect() end
+        if zConnection then zConnection:Disconnect() end
+        stopForceUpdate()
+        setJumpForce(50)
+        jumpBoostEnabled = false
+    end
+    
+    if antivoidEnabled then
+        toggleAntivoid(false)
+    end
+    
+    if teleportToolEnabled then
+        if teleportTool and teleportTool.Parent then
+            pcall(function() teleportTool:Destroy() end)
+            teleportTool = nil
+        end
+        teleportToolEnabled = false
+    end
+    
+    if flingEnabled then
+        if flingGUI and flingGUI.Parent then
+            pcall(function() flingGUI:Destroy() end)
+            flingGUI = nil
+        end
+        flingEnabled = false
+    end
+    
+    if recordTeleportEnabled then
+        if recordTeleportScript then
+            recordTeleportScript:Disconnect()
+            recordTeleportScript = nil
+        end
+        recordTeleportEnabled = false
+    end
+    
+    if espEnabled then
+        -- ESP удален, но оставляем переменную для совместимости
+        espEnabled = false
+    end
+    
+    if infinityEnabled then
+        toggleInfinity(false)
+        infinityEnabled = false
+    end
+    
+    if flyEnabled then
+        if flyGuiConnection then
+            flyGuiConnection:Disconnect()
+            flyGuiConnection = nil
+        end
+        flyEnabled = false
+    end
+    
+    if noclipEnabled then
+        toggleNoclip(false)
+        noclipEnabled = false
+    end
+    
+    if infYieldEnabled then
+        toggleInfYield(false)
+        infYieldEnabled = false
+    end
+    
+    if antiFlingEnabled then
+        toggleAntiFling(false)
+        antiFlingEnabled = false
+    end
+    
+    if ultraInstinctEnabled then
+        toggleUltraInstinct(false)
+        ultraInstinctEnabled = false
+    end
+    
+    if ropeEnabled then
+        toggleRope(false)
+        ropeEnabled = false
+    end
+    
+    if autoCraftEnabled then
+        toggleAutoCraft(false)
+        autoCraftEnabled = false
+    end
+    
+    if playerTeleportEnabled then
+        togglePlayerTeleport(false)
+        playerTeleportEnabled = false
+    end
+    
+    if sitEnabled then
+        toggleSit(false)
+        sitEnabled = false
+    end
+    
+    if loopWSEnabled then
+        toggleLoopWS(false)
+        loopWSEnabled = false
+    end
+    
+    if hoverEnabled then
+        toggleHover(false)
+        hoverEnabled = false
+    end
+    
+    if task1Enabled then
+        toggleTask1(false)
+        task1Enabled = false
+    end
+    
+    if task2Enabled then
+        toggleTask2(false)
+        task2Enabled = false
+    end
+    
+    if task3Enabled then
+        toggleTask3(false)
+        task3Enabled = false
+    end
+    
+    if task4Enabled then
+        toggleTask4(false)
+        task4Enabled = false
+    end
+    
+    if task5Enabled then
+        toggleTask5(false)
+        task5Enabled = false
+    end
+    
+    if task6Enabled then
+        toggleTask6(false)
+        task6Enabled = false
+    end
+    
+    if task7Enabled then
+        toggleTask7(false)
+        task7Enabled = false
+    end
+    
+    if task8Enabled then
+        toggleTask8(false)
+        task8Enabled = false
+    end
+    
+    if autoTeleportItemsEnabled then
+        toggleAutoTeleportItems(false)
+        autoTeleportItemsEnabled = false
+    end
+    
+    if autoHitEnabled then
+        toggleAutoHit(false)
+        autoHitEnabled = false
+    end
+    
+    if invisiblePlatformEnabled then
+        toggleInvisiblePlatform(false)
+        invisiblePlatformEnabled = false
+    end
+    
+    if coordinatesGrabberEnabled then
+        toggleCoordinatesGrabber(false)
+        coordinatesGrabberEnabled = false
+    end
+    
+    if superRingPartsEnabled then
+        toggleSuperRingParts(false)
+        superRingPartsEnabled = false
+    end
+    
+    if signDeleterEnabled then
+        toggleSignDeleter(false)
+        signDeleterEnabled = false
+    end
+    
+    if resetOnRespawnEnabled then
+        toggleResetOnRespawn(false)
+        resetOnRespawnEnabled = false
+    end
+    
+    saveSettings()
+end
+
+-- Создание интерфейса
+local TeleportToggle = Tabs.Main:AddToggle("TeleportToggle", {
+    Title = "Костер Телепорт",
+    Description = "Нажмите C для телепорта в костер и обратно",
+    Default = teleportEnabled,
+    Callback = function(Value)
+        teleportEnabled = Value
+        
+        if Value then
+            initializeTeleportScript()
+        else
+            if teleportConnection then
+                teleportConnection:Disconnect()
+                teleportConnection = nil
+            end
+            positionHistory = {}
+            isTeleporting = false
+        end
+        saveSettings()
+    end
+})
+
+local TeleportToolToggle = Tabs.Main:AddToggle("TeleportToolToggle", {
+    Title = "Телепорт тул",
+    Description = "Создает инструмент для телепортации в инвентаре",
+    Default = teleportToolEnabled,
+    Callback = function(Value)
+        teleportToolEnabled = Value
+        if Value then
+            teleportTool = createTeleportTool()
+            setupTeleportToolAutoGive()
+        else
+            if teleportTool then
+                pcall(function() teleportTool:Destroy() end)
+                teleportTool = nil
+            end
+        end
+        saveSettings()
+    end
+})
+
+local JumpBoostToggle = Tabs.Main:AddToggle("JumpBoostToggle", {
+    Title = "Ран Буст",
+    Description = "Q - включить, Z - выключить",
+    Default = jumpBoostEnabled,
+    Callback = function(Value)
+        jumpBoostEnabled = Value
+        
+        if Value then
+            initializeJumpBoostScript()
+        else
+            if qConnection then qConnection:Disconnect() end
+            if zConnection then zConnection:Disconnect() end
+            stopForceUpdate()
+            setJumpForce(50)
+        end
+        saveSettings()
+    end
+})
+
+local JumpForceSlider = Tabs.Main:AddSlider("JumpForceSlider", {
+    Title = "Сила прыжка",
+    Description = "Установите силу прыжка (50-500)",
+    Default = jumpForce,
+    Min = 50,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        jumpForce = Value
+        if jumpBoostEnabled and jumpUpdateLoop then
+            setJumpForce(jumpForce)
+        end
+        saveSettings()
+    end
+})
+
+local AntivoidToggle = Tabs.Main:AddToggle("AntivoidToggle", {
+    Title = "Антивоид для канализации",
+    Description = "Создает невидимые платформы для защиты от падения",
+    Default = antivoidEnabled,
+    Callback = function(Value)
+        toggleAntivoid(Value)
+    end
+})
+
+local InvisiblePlatformToggle = Tabs.Main:AddToggle("InvisiblePlatformToggle", {
+    Title = "Невидимая платформа",
+    Description = "Создает большую невидимую платформу",
+    Default = invisiblePlatformEnabled,
+    Callback = function(Value)
+        toggleInvisiblePlatform(Value)
+    end
+})
+
+local InfinityToggle = Tabs.Main:AddToggle("InfinityToggle", {
+    Title = "Infinity",
+    Description = "Аура отталкивания игроков",
+    Default = infinityEnabled,
+    Callback = function(Value)
+        infinityEnabled = Value
+        toggleInfinity(Value)
+    end
+})
+
+local UltraInstinctToggle = Tabs.Main:AddToggle("UltraInstinctToggle", {
+    Title = "Ультра инстинкт",
+    Description = "Автоматическое уклонение от хитбоксов",
+    Default = ultraInstinctEnabled,
+    Callback = function(Value)
+        ultraInstinctEnabled = Value
+        toggleUltraInstinct(Value)
+    end
+})
+
+local RopeToggle = Tabs.Main:AddToggle("RopeToggle", {
+    Title = "Верёвка",
+    Description = "Инструмент веревки + клавиша L для второй веревки",
+    Default = ropeEnabled,
+    Callback = function(Value)
+        ropeEnabled = Value
+        toggleRope(Value)
+    end
+})
+
+local AutoCraftToggle = Tabs.Main:AddToggle("AutoCraftToggle", {
+    Title = "Автокрафт",
+    Description = "Кнопка для быстрого телепорта к крафту (Клавиша: P)",
+    Default = autoCraftEnabled,
+    Callback = function(Value)
+        autoCraftEnabled = Value
+        toggleAutoCraft(Value)
+    end
+})
+
+local PlayerTeleportToggle = Tabs.Main:AddToggle("PlayerTeleportToggle", {
+    Title = "Телепорт к человеку",
+    Description = "Открывает GUI для телепорта к игрокам (F5)",
+    Default = playerTeleportEnabled,
+    Callback = function(Value)
+        playerTeleportEnabled = Value
+        togglePlayerTeleport(Value)
+    end
+})
+
+local SitToggle = Tabs.Main:AddToggle("SitToggle", {
+    Title = "Sit команда",
+    Description = "Активирует команду sit (Клавиша: " .. sitKeybind .. ")",
+    Default = sitEnabled,
+    Callback = function(Value)
+        sitEnabled = Value
+        toggleSit(Value)
+    end
+})
+
+local LoopWSToggle = Tabs.Main:AddToggle("LoopWSToggle", {
+    Title = "LoopWS 16",
+    Description = "Устанавливает скорость передвижения на 16",
+    Default = loopWSEnabled,
+    Callback = function(Value)
+        loopWSEnabled = Value
+        toggleLoopWS(Value)
+    end
+})
+
+local HoverToggle = Tabs.Main:AddToggle("HoverToggle", {
+    Title = "Зависание над человеком",
+    Description = "Позволяет зависать над выбранным игроком (F5 для UI)",
+    Default = hoverEnabled,
+    Callback = function(Value)
+        hoverEnabled = Value
+        toggleHover(Value)
+    end
+})
+
+local AutoTeleportItemsToggle = Tabs.Main:AddToggle("AutoTeleportItemsToggle", {
+    Title = "Автотелепорт предметов",
+    Description = "Автоматически телепортирует предметы из папок к ногам",
+    Default = autoTeleportItemsEnabled,
+    Callback = function(Value)
+        autoTeleportItemsEnabled = Value
+        toggleAutoTeleportItems(Value)
+    end
+})
+
+local AutoHitToggle = Tabs.Main:AddToggle("AutoHitToggle", {
+    Title = "Автоудар",
+    Description = "Автоматически бьет других игроков",
+    Default = autoHitEnabled,
+    Callback = function(Value)
+        autoHitEnabled = Value
+        toggleAutoHit(Value)
+    end
+})
+
+local CoordinatesGrabberToggle = Tabs.Main:AddToggle("CoordinatesGrabberToggle", {
+    Title = "Coordinates Grabber",
+    Description = "Показывает и копирует координаты игрока",
+    Default = coordinatesGrabberEnabled,
+    Callback = function(Value)
+        toggleCoordinatesGrabber(Value)
+    end
+})
+
+local ResetOnRespawnToggle = Tabs.Main:AddToggle("ResetOnRespawnToggle", {
+    Title = "Ресет на месте",
+    Description = "При респавне через меню остаетесь на том же месте",
+    Default = resetOnRespawnEnabled,
+    Callback = function(Value)
+        resetOnRespawnEnabled = Value
+        toggleResetOnRespawn(Value)
+    end
+})
+
+local TrenchToggle = Tabs.Main:AddToggle("TrenchToggle", {
+    Title = "Создать блокирование костра",
+    Description = "Создает блокирование в указанных координатах",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            local trenchPosition = Vector3.new(-74.634918, 2050.771240, 105.815659)
+            local trenchSize = Vector3.new(7, 8, 7)
+
+            local trench = Instance.new("Part")
+            trench.Size = trenchSize
+            trench.Position = trenchPosition
+            trench.Anchored = true
+            trench.BrickColor = BrickColor.new("Dark Stone Grey")
+            trench.Name = "koster"
+            trench.Parent = workspace
+
+        else
+            local trench = workspace:FindFirstChild("koster")
+            if trench then
+                pcall(function() trench:Destroy() end)
+            end
+        end
+    end
+})
+
+local Task1Toggle = Tabs.Main:AddToggle("Task1Toggle", {
+    Title = "Задача 1 - Канализация",
+    Description = "Нажмите H на игроке для отметки, G для очистки",
+    Default = task1Enabled,
+    Callback = function(Value)
+        task1Enabled = Value
+        toggleTask1(Value)
+    end
+})
+
+local Task2Toggle = Tabs.Main:AddToggle("Task2Toggle", {
+    Title = "Задача 2 - Banana",
+    Description = "Нажмите H на игроке для отметки, G для очистки",
+    Default = task2Enabled,
+    Callback = function(Value)
+        task2Enabled = Value
+        toggleTask2(Value)
+    end
+})
+
+local Task3Toggle = Tabs.Main:AddToggle("Task3Toggle", {
+    Title = "Задача 3 - Ragdoll",
+    Description = "Нажмите R для телепорта части rea к себе",
+    Default = task3Enabled,
+    Callback = function(Value)
+        task3Enabled = Value
+        toggleTask3(Value)
+    end
+})
+
+local Task5Toggle = Tabs.Main:AddToggle("Task5Toggle", {
+    Title = "Задача 5 - Rea Mark",
+    Description = "Нажмите H на игроке для отметки, G для очистки",
+    Default = task5Enabled,
+    Callback = function(Value)
+        task5Enabled = Value
+        toggleTask5(Value)
+    end
+})
+
+local Task6Toggle = Tabs.Main:AddToggle("Task6Toggle", {
+    Title = "Задача 6 - Pee Mark",
+    Description = "Нажмите H на игроке для отметки, G для очистки",
+    Default = task6Enabled,
+    Callback = function(Value)
+        task6Enabled = Value
+        toggleTask6(Value)
+    end
+})
+
+local Task7Toggle = Tabs.Main:AddToggle("Task7Toggle", {
+    Title = "Задача 7 - Kil Mark",
+    Description = "Нажмите H на игроке для отметки, G для очистки",
+    Default = task7Enabled,
+    Callback = function(Value)
+        task7Enabled = Value
+        toggleTask7(Value)
+    end
+})
+
+local Task8Toggle = Tabs.Main:AddToggle("Task8Toggle", {
+    Title = "Задача 8 - GripPos",
+    Description = "Нажмите G для установки grippos на инструменте",
+    Default = task8Enabled,
+    Callback = function(Value)
+        task8Enabled = Value
+        toggleTask8(Value)
+    end
+})
+
+local GripPosXSlider = Tabs.Main:AddSlider("GripPosXSlider", {
+    Title = "GripPos X",
+    Description = "Установите позицию X для grippos (0-100)",
+    Default = gripPosX,
+    Min = 0,
+    Max = 100,
+    Rounding = 1,
+    Callback = function(Value)
+        gripPosX = Value
+        saveSettings()
+    end
+})
+
+local GripPosYSlider = Tabs.Main:AddSlider("GripPosYSlider", {
+    Title = "GripPos Y",
+    Description = "Установите позицию Y для grippos (0-100)",
+    Default = gripPosY,
+    Min = 0,
+    Max = 100,
+    Rounding = 1,
+    Callback = function(Value)
+        gripPosY = Value
+        saveSettings()
+    end
+})
+
+local GripPosZSlider = Tabs.Main:AddSlider("GripPosZSlider", {
+    Title = "GripPos Z",
+    Description = "Установите позицию Z для grippos (0-100)",
+    Default = gripPosZ,
+    Min = 0,
+    Max = 100,
+    Rounding = 1,
+    Callback = function(Value)
+        gripPosZ = Value
+        saveSettings()
+    end
+})
+
+Tabs.Teleport:AddParagraph({
+    Title = "Телепорты",
+    Content = "Выберите место для телепорта"
+})
+
+local teleportLocations = {
+    ["База"] = Vector3.new(0, 2050, 0),
+    ["Костер"] = Vector3.new(-79.883614, 2052.999756, 91.486588),
+    ["Крафт"] = Vector3.new(53.173717, 2052.998779, 49.446697),
+    ["Канализация"] = Vector3.new(170.213501, 2024.999023, -109.167267),
+    ["Дом"] = Vector3.new(-219.836273, 2101.999756, 195.175629),
+    ["За вода"] = Vector3.new(-185.897461, 2053.014893, 206.462280),
+    ["Угол карты"] = Vector3.new(250, 2050, 250),
+    ["Гараж"] = Vector3.new(88.527657, 2072.989014, 24.005852),
+    ["Трейд"] = Vector3.new(157.603455, 2052.999756, 125.996918)
+}
+
+for name, position in pairs(teleportLocations) do
+    Tabs.Teleport:AddButton({
+        Title = "Телепорт на " .. name,
+        Description = "Телепортирует на " .. name,
+        Callback = function()
+            local player = game.Players.LocalPlayer
+            if isPlayerValid(player) and player.Character then
+                teleportToPosition(position)
+            end
+            end
+    })
+end
+
+Tabs.Other:AddParagraph({
+    Title = "Дополнительные функции",
+    Content = "Разные полезные функции"
+})
+
+local FlingToggle = Tabs.Other:AddToggle("FlingToggle", {
+    Title = "Multi-Target Fling",
+    Description = "KILASIK's Ultimate Fling GUI",
+    Default = false,
+    Callback = function(Value)
+        flingEnabled = Value
+        if Value then
+            flingGUI = createFlingGUI()
+            Fluent:Notify({
+                Title = "Fling GUI активирован",
+                Content = "Открыт интерфейс Multi-Target Fling",
+                Duration = 3
+            })
+        else
+            closeFlingGUI()
+            flingEnabled = false
+        end
+    end
+})
+
+local RecordTeleportToggle = Tabs.Other:AddToggle("RecordTeleportToggle", {
+    Title = "Запись позиций + Телепорт",
+    Description = "B - запись, N - телепорт к последней позиции",
+    Default = false,
+    Callback = function(Value)
+        recordTeleportEnabled = Value
+        if Value then
+            recordTeleportScript = createRecordTeleportScript()
+            Fluent:Notify({
+                Title = "Запись позиций активирована",
+                Content = "Нажмите B для записи, N для телепорта",
+                Duration = 3
+            })
+        else
+            if recordTeleportScript then
+                recordTeleportScript:Disconnect()
+                recordTeleportScript = nil
+            end
+            Fluent:Notify({
+                Title = "Запись позиций отключена",
+                Content = "Функция записи позиций отключена",
+                Duration = 3
+            })
+        end
+    end
+})
+
+local NoclipToggle = Tabs.Other:AddToggle("NoclipToggle", {
+    Title = "Noclip",
+    Description = "Позволяет проходить сквозь стены",
+    Default = false,
+    Callback = function(Value)
+        noclipEnabled = Value
+        if Value then
+            toggleNoclip(true)
+            Fluent:Notify({
+                Title = "Noclip активирован",
+                Content = "Режим Noclip включен",
+                Duration = 2
+            })
+        else
+            toggleNoclip(false)
+            Fluent:Notify({
+                Title = "Noclip отключен",
+                Content = "Режим Noclip выключена",
+                Duration = 2
+            })
+        end
+    end
+})
+
+local FlyToggle = Tabs.Other:AddToggle("FlyToggle", {
+    Title = "Fly GUI V3",
+    Description = "Включает Fly GUI V3",
+    Default = flyEnabled,
+    Callback = function(Value)
+        flyEnabled = Value
+        if Value then
+            flyGuiConnection = loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
+        else
+            if flyGuiConnection then
+                flyGuiConnection:Disconnect()
+                flyGuiConnection = nil
+            end
+        end
+        saveSettings()
+    end
+})
+
+local InfYieldButton = Tabs.Other:AddButton({
+    Title = "Infinite Yield",
+    Description = "Мощный админ-скрипт с множеством функций",
+    Callback = function()
+        if not infYieldEnabled then
+            local success, result = pcall(function()
+                loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+            end)
+            
+            if success then
+                infYieldEnabled = true
+                Fluent:Notify({
+                    Title = "Infinite Yield активирован",
+                    Content = "Нажмите F9 для открытия меню",
+                    Duration = 3
+                })
+            else
+                Fluent:Notify({
+                    Title = "Ошибка Infinite Yield",
+                    Content = "Не удалось загрузить Infinite Yield",
+                    Duration = 3
+                })
+            end
+        else
+            Fluent:Notify({
+                Title = "Infinite Yield",
+                Content = "Уже активирован. Нажмите F9 для меню",
+                Duration = 3
+            })
+        end
+    end
+})
+
+local AntiFlingToggle = Tabs.Other:AddToggle("AntiFlingToggle", {
+    Title = "Anti-Fling",
+    Description = "Защита от флинга других игроков (Infinity Yield метод)",
+    Default = antiFlingEnabled,
+    Callback = function(Value)
+        antiFlingEnabled = Value
+        toggleAntiFling(Value)
+    end
+})
+
+local SigmaButton = Tabs.Other:AddButton({
+    Title = "Sigma Bypasser",
+    Description = "Активировать Sigma Bypasser",
+    Callback = function()
+        local success, result = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/shakk-code/SigmaBypasser/refs/heads/main/source", true))()
+        end)
+        
+        if success then
+            Fluent:Notify({
+                Title = "Sigma Bypasser активирован",
+                Content = "Скрипт успешно загружен",
+                Duration = 3
+            })
+        else
+            Fluent:Notify({
+                Title = "Ошибка Sigma Bypasser",
+                Content = "Не удалось загрузить Sigma Bypasser",
+                Duration = 3
+            })
+        end
+    end
+})
+
+Tabs.Events:AddParagraph({
+    Title = "Эвенты",
+    Content = "Функции для различных эвентов"
+})
+
+local SuperRingPartsToggle = Tabs.Events:AddToggle("SuperRingPartsToggle", {
+    Title = "Super Ring Parts V6",
+    Description = "Активирует Super Ring Parts by lukas",
+    Default = superRingPartsEnabled,
+    Callback = function(Value)
+        toggleSuperRingParts(Value)
+    end
+})
+
+local SignDeleterToggle = Tabs.Events:AddToggle("SignDeleterToggle", {
+    Title = "Sign Deleter V3.0",
+    Description = "Активирует Sign Deleter by Sharik",
+    Default = signDeleterEnabled,
+    Callback = function(Value)
+        toggleSignDeleter(Value)
+    end
+})
+
+-- Система кейбиндов
+Tabs.Keybinds:AddParagraph({
+    Title = "💎 Система Кейбиндов",
+    Content = "Настройте горячие клавиши для всех функций"
+})
+
+local KeybindsMasterToggle = Tabs.Keybinds:AddToggle("KeybindsMasterToggle", {
+    Title = "Включить систему кейбиндов",
+    Description = "Активирует все назначенные горячие клавиши",
+    Default = keybindsEnabled,
+    Callback = function(Value)
+        keybindsEnabled = Value
+        toggleAllKeybinds(Value)
+    end
+})
+
+-- Функция для создания окна настройки кейбинда
+local function createKeybindWindow(toggleName, keybindName, description)
+    Tabs.Keybinds:AddButton({
+        Title = "Настроить " .. description,
+        Description = "Текущая клавиша: " .. (keybindSettings[keybindName] or "Не назначена"),
+        Callback = function()
+            local keybindWindow = Fluent:CreateWindow({
+                Title = "Настройка кейбинда",
+                SubTitle = description,
+                TabWidth = 160,
+                Size = UDim2.fromOffset(400, 200),
+                Acrylic = true,
+                Theme = Fluent.CurrentTheme
+            })
+            
+            local KeybindTab = keybindWindow:AddTab({Title = "Выбор клавиши", Icon = "key"})
+            
+            KeybindTab:AddParagraph({
+                Title = "Выберите новую клавишу",
+                Content = "Текущая: " .. (keybindSettings[keybindName] or "Не назначена")
+            })
+            
+            local keyInput = KeybindTab:AddButton({
+                Title = "🎮 Нажмите для ввода клавиши",
+                Description = "Кликните и нажмите любую клавишу",
+                Callback = function() end
+            })
+            
+            local selectedKey = nil
+            local inputConnection = nil
+            
+            inputConnection = game:GetService("UserInputService").InputBegan:Connect(function(input)
+                if input.KeyCode ~= Enum.KeyCode.Unknown then
+                    selectedKey = input.KeyCode.Name
+                    keyInput:SetDesc("Выбрано: " .. selectedKey)
+                end
+            end)
+            
+            KeybindTab:AddButton({
+                Title = "✅ Сохранить",
+                Description = "Сохранить выбранную клавишу",
+                Callback = function()
+                    if selectedKey then
+                        keybindSettings[keybindName] = selectedKey
+                        saveSettings()
+                        
+                        if keybindsEnabled then
+                            setupKeybind(keybindName, function()
+                                -- Активировать соответствующую функцию
+                                if toggleName == "RopeToggle" and ropeEnabled then
+                                    -- Активировать веревку
+                                elseif toggleName == "TeleportToggle" and teleportEnabled then
+                                    -- Активировать телепорт
+                                end
+                            end)
+                        end
+                        
+                        keybindWindow:Destroy()
+                        inputConnection:Disconnect()
+                        
+                        Fluent:Notify({
+                            Title = "Кейбинд обновлен",
+                            Content = description .. " → " .. selectedKey,
+                            Duration = 3
+                        })
+                    end
+                end
+            })
+            
+            KeybindTab:AddButton({
+                Title = "❌ Отмена",
+                Description = "Закрыть окно настроек",
+                Callback = function()
+                    keybindWindow:Destroy()
+                    if inputConnection then
+                        inputConnection:Disconnect()
+                    end
+                end
+            })
+        end
+    })
+end
+
+-- Создание кейбиндов для всех функций
+createKeybindWindow("RopeToggle", "Rope", "Веревка")
+createKeybindWindow("TeleportToggle", "Teleport", "Костер Телепорт")
+createKeybindWindow("AutoCraftToggle", "AutoCraft", "Автокрафт")
+createKeybindWindow("PlayerTeleportToggle", "PlayerTeleportGUI", "Телепорт к игрокам")
+createKeybindWindow("SitToggle", "Sit", "Сидеть/Встать")
+createKeybindWindow("InfinityToggle", "InfinityToggle", "Infinity")
+createKeybindWindow("RecordTeleportToggle", "RecordStart", "Запись позиций")
+createKeybindWindow("RecordTeleportToggle", "RecordTeleport", "Телепорт по записи")
+createKeybindWindow("JumpBoostToggle", "JumpBoostOn", "Включить прыжок")
+createKeybindWindow("JumpBoostToggle", "JumpBoostOff", "Выключить прыжок")
+createKeybindWindow("Task1Toggle", "Task1Mark", "Задача 1 - Отметка")
+createKeybindWindow("Task1Toggle", "Task1Clear", "Задача 1 - Очистка")
+createKeybindWindow("Task2Toggle", "Task2Mark", "Задача 2 - Отметка")
+createKeybindWindow("Task2Toggle", "Task2Clear", "Задача 2 - Очистка")
+createKeybindWindow("Task3Toggle", "Task3Teleport", "Задача 3 - Телепорт")
+createKeybindWindow("Task5Toggle", "Task5Mark", "Задача 5 - Отметка")
+createKeybindWindow("Task5Toggle", "Task5Clear", "Задача 5 - Очистка")
+createKeybindWindow("Task6Toggle", "Task6Mark", "Задача 6 - Отметка")
+createKeybindWindow("Task6Toggle", "Task6Clear", "Задача 6 - Очистка")
+createKeybindWindow("Task7Toggle", "Task7Mark", "Задача 7 - Отметка")
+createKeybindWindow("Task7Toggle", "Task7Clear", "Задача 7 - Очистка")
+createKeybindWindow("Task8Toggle", "Task8Grip", "Задача 8 - GripPos")
+
+Tabs.Keybinds:AddButton({
+    Title = "🔄 Сбросить все кейбинды",
+    Description = "Восстановить настройки по умолчанию",
+    Callback = function()
+        keybindSettings = {
+            Teleport = "C",
+            JumpBoostOn = "Q", 
+            JumpBoostOff = "Z",
+            Rope = "L",
+            AutoCraft = "P",
+            PlayerTeleportGUI = "F5",
+            Sit = "R",
+            Task1Mark = "H",
+            Task1Clear = "G",
+            Task2Mark = "H",
+            Task2Clear = "G",
+            Task3Teleport = "R",
+            Task5Mark = "H",
+            Task5Clear = "G", 
+            Task6Mark = "H",
+            Task6Clear = "G",
+            Task7Mark = "H",
+            Task7Clear = "G",
+            Task8Grip = "G",
+            RecordStart = "B",
+            RecordTeleport = "N",
+            InfinityToggle = "J"
+        }
+        
+        if keybindsEnabled then
+            toggleAllKeybinds(true)
+        end
+        
+        saveSettings()
+        Fluent:Notify({
+            Title = "Кейбинды сброшены",
+            Content = "Все настройки восстановлены по умолчанию",
+            Duration = 3
+        })
+    end
+})
+
+-- Настройки
+Tabs.Settings:AddParagraph({
+    Title = "Настройки интерфейса",
+    Content = "Измените внешний вид интерфейса"
+})
+
+Tabs.Settings:AddDropdown("ThemeDropdown", {
+    Title = "Тема интерфейса",
+    Description = "Выберите тему интерфейса",
+    Values = {"Dark", "Darker", "Light", "Aqua", "Amethyst", "Rose"},
+    Default = savedSettings and savedSettings.Theme or "Dark",
+    Multi = false,
+    Callback = function(Value)
+        Fluent:SetTheme(Value)
+        saveSettings()
+        Fluent:Notify({
+            Title = "Тема изменена",
+            Content = "Тема изменена на: " .. Value,
+            Duration = 2
+        })
+    end
+})
+
+Tabs.Settings:AddButton({
+    Title = "Сохранить настройки",
+    Description = "Сохраняет текущие настройки функций",
+    Callback = function()
+        saveSettings()
+        Fluent:Notify({
+            Title = "Настройки сохранены",
+            Content = "Все текущие настройки функций сохранены",
+            Duration = 3
+        })
+    end
+})
+
+Tabs.Settings:AddButton({
+    Title = "Сброс настроек",
+    Description = "Сбрасывает все настройки к значениям по умолчанию",
+    Callback = function()
+        delfile("SPVK_Hub_Settings.txt")
+        Fluent:Notify({
+            Title = "Настройки сброшены",
+            Content = "Все настройки сброшены к значениям по умолчанию",
+            Duration = 3
+        })
+    end
+})
+
+Tabs.Settings:AddButton({
+    Title = "Закрыть интерфейс",
+    Description = "Полностью закрывает интерфейс и отключает все функции",
+    Callback = function()
+        disableAllFeatures()
+        Window:Destroy()
+        Fluent:Notify({
+            Title = "Интерфейс закрыт",
+            Content = "Все функции отключены",
+            Duration = 2
+        })
+    end
+})
+
+Tabs.Credits:AddParagraph({
+    Title = "Разработчики",
+    Content = "Napoleon и Sharik"
+})
+
+Tabs.Credits:AddParagraph({
+    Title = "Версия",
+    Content = "СПВК hub v1.8.1 (Ultra Instinct + Teleport Tool + Rope + Sigma Bypasser + Hover + AutoTeleport + AutoHit + ResetOnRespawn + Keybinds System)"
+})
+
+Tabs.Credits:AddParagraph({
+    Title = "Благодарности",
+    Content = "Спасибо всем, кто поддерживает наш проект!"
+})
+
+-- Инициализация
+local function fixWalkingIssue()
+    local player = game.Players.LocalPlayer
+    if not isPlayerValid(player) then return end
+    
+    if not player.Character then
+        player.CharacterAdded:Wait()
+        wait(1)
+    end
+    
+    local character = player.Character
+    if not isCharacterValid(character) then return end
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    humanoid.WalkSpeed = 16
+    
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BodyVelocity") or part:IsA("BodyAngularVelocity") or part:IsA("BodyForce") then
+            if part.Name ~= "GripBodyPosition" then
+                pcall(function() part:Destroy() end)
+            end
+        end
+    end
+end
+
+-- Восстановление сохраненных настроек
+if savedSettings then
+    if Tabs.Main then
+        if TeleportToggle then
+            TeleportToggle:SetValue(savedSettings.TeleportEnabled)
+        end
+        if TeleportToolToggle then
+            TeleportToolToggle:SetValue(savedSettings.TeleportToolEnabled)
+        end
+        if JumpBoostToggle then
+            JumpBoostToggle:SetValue(savedSettings.JumpBoostEnabled)
+        end
+        if AntivoidToggle then
+            AntivoidToggle:SetValue(savedSettings.AntivoidEnabled)
+        end
+        if JumpForceSlider then
+            JumpForceSlider:SetValue(savedSettings.JumpForce)
+        end
+        if InfinityToggle then
+            InfinityToggle:SetValue(savedSettings.InfinityEnabled)
+        end
+        if UltraInstinctToggle then
+            UltraInstinctToggle:SetValue(savedSettings.UltraInstinctEnabled)
+        end
+        if RopeToggle then
+            RopeToggle:SetValue(savedSettings.RopeEnabled)
+        end
+        if AutoCraftToggle then
+            AutoCraftToggle:SetValue(savedSettings.AutoCraftEnabled)
+        end
+        if PlayerTeleportToggle then
+            PlayerTeleportToggle:SetValue(savedSettings.PlayerTeleportEnabled)
+        end
+        if SitToggle then
+            SitToggle:SetValue(savedSettings.SitEnabled)
+        end
+        if LoopWSToggle then
+            LoopWSToggle:SetValue(savedSettings.LoopWSEnabled)
+        end
+        if HoverToggle then
+            HoverToggle:SetValue(savedSettings.HoverEnabled)
+        end
+        if Task1Toggle then
+            Task1Toggle:SetValue(savedSettings.Task1Enabled or false)
+        end
+        if Task2Toggle then
+            Task2Toggle:SetValue(savedSettings.Task2Enabled or false)
+        end
+        if Task3Toggle then
+            Task3Toggle:SetValue(savedSettings.Task3Enabled or false)
+        end
+        if Task5Toggle then
+            Task5Toggle:SetValue(savedSettings.Task5Enabled or false)
+        end
+        if Task6Toggle then
+            Task6Toggle:SetValue(savedSettings.Task6Enabled or false)
+        end
+        if Task7Toggle then
+            Task7Toggle:SetValue(savedSettings.Task7Enabled or false)
+        end
+        if Task8Toggle then
+            Task8Toggle:SetValue(savedSettings.Task8Enabled or false)
+        end
+        if GripPosXSlider then
+            GripPosXSlider:SetValue(savedSettings.GripPosX or 0)
+        end
+        if GripPosYSlider then
+            GripPosYSlider:SetValue(savedSettings.GripPosY or 0)
+        end
+        if GripPosZSlider then
+            GripPosZSlider:SetValue(savedSettings.GripPosZ or 0)
+        end
+        if AutoTeleportItemsToggle then
+            AutoTeleportItemsToggle:SetValue(savedSettings.AutoTeleportItemsEnabled or false)
+        end
+        if AutoHitToggle then
+            AutoHitToggle:SetValue(savedSettings.AutoHitEnabled or false)
+        end
+        if ResetOnRespawnToggle then
+            ResetOnRespawnToggle:SetValue(savedSettings.ResetOnRespawnEnabled or false)
+        end
+    end
+    
+    if KeybindsMasterToggle then
+        KeybindsMasterToggle:SetValue(savedSettings.KeybindsEnabled or false)
+    end
+    
+    if savedSettings.FlyEnabled then
+        flyEnabled = true
+        flyGuiConnection = loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
+    end
+    
+    if savedSettings.InfYieldEnabled then
+        infYieldEnabled = true
+        toggleInfYield(true)
+    end
+    
+    if savedSettings.AntiFlingEnabled then
+        antiFlingEnabled = true
+        toggleAntiFling(true)
+    end
+    
+    if savedSettings.UltraInstinctEnabled then
+        ultraInstinctEnabled = true
+        toggleUltraInstinct(true)
+    end
+    
+    if savedSettings.HoverEnabled then
+        hoverEnabled = true
+        toggleHover(true)
+    end
+    
+    if savedSettings.Task1Enabled then
+        task1Enabled = true
+        toggleTask1(true)
+    end
+    
+    if savedSettings.Task2Enabled then
+        task2Enabled = true
+        toggleTask2(true)
+    end
+    
+    if savedSettings.Task3Enabled then
+        task3Enabled = true
+        toggleTask3(true)
+    end
+    
+    if savedSettings.Task5Enabled then
+        task5Enabled = true
+        toggleTask5(true)
+    end
+    
+    if savedSettings.Task6Enabled then
+        task6Enabled = true
+        toggleTask6(true)
+    end
+    
+    if savedSettings.Task7Enabled then
+        task7Enabled = true
+        toggleTask7(true)
+    end
+    
+    if savedSettings.Task8Enabled then
+        task8Enabled = true
+        toggleTask8(true)
+    end
+    
+    if savedSettings.AutoTeleportItemsEnabled then
+        autoTeleportItemsEnabled = true
+        toggleAutoTeleportItems(true)
+    end
+    
+    if savedSettings.AutoHitEnabled then
+        autoHitEnabled = true
+        toggleAutoHit(true)
+    end
+    
+    if savedSettings.ResetOnRespawnEnabled then
+        resetOnRespawnEnabled = true
+        toggleResetOnRespawn(true)
+    end
+    
+    if savedSettings.Theme then
+        Fluent:SetTheme(savedSettings.Theme)
+    end
+    
+    -- Включить кейбинды если они были включены
+    if savedSettings.KeybindsEnabled then
+        toggleAllKeybinds(true)
+    end
+end
+
+setupTeleportToolAutoGive()
+
+task.wait(2)
+fixWalkingIssue()
+
+Window:OnClose(function()
+    disableAllFeatures()
+end)
+
+Fluent:Notify({
+    Title = "СПВК Hub v1.8.1 загружен",
+    Content = "Все функции сохранены! Система кейбиндов активирована.",
+    Duration = 5
+})
